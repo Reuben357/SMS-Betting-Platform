@@ -5,9 +5,11 @@ const client = createClient({
   url: process.env.REDIS_URL,
 });
 
-client.on('error', (err) => console.error('Redis error:', err));
+client.on('error', (err) => console.error('Redis error:', err.message));
 client.on('connect', () => console.log('Connected to Redis'));
 
-(async () => { await client.connect(); })();
+client.connect().catch((err) => {
+  console.error('Redis initial connection failed:', err.message);
+});
 
 module.exports = client;
