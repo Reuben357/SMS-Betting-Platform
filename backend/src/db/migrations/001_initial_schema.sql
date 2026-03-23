@@ -1,6 +1,4 @@
--- =============================================
--- ENUMS
--- =============================================
+-- Enums
 
 CREATE TYPE payment_status AS ENUM (
   'matched',
@@ -28,9 +26,7 @@ CREATE TYPE message_status AS ENUM (
   'failed'
 );
 
--- =============================================
--- USERS
--- =============================================
+-- Users
 
 CREATE TABLE users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -41,9 +37,7 @@ CREATE TABLE users (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- =============================================
--- PACKAGES
--- =============================================
+-- Packages 
 
 CREATE TABLE packages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -62,9 +56,7 @@ INSERT INTO packages (name, price, tip_count, game_count) VALUES
   ('8 Odds', 30, 8, 10),
   ('10 Odds', 50, 10, 15);
 
--- =============================================
--- POTENTIAL CUSTOMER TIERS (configuration)
--- =============================================
+-- Potential Customer Tiers
 
 CREATE TABLE tiers_potential (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -83,9 +75,7 @@ INSERT INTO tiers_potential (tier_number, min_frequency, max_frequency) VALUES
   (4, 151, 200),
   (5, 201, 250);
 
--- =============================================
--- ACTIVE CUSTOMER TIERS (configuration)
--- =============================================
+-- Active Customer Tiers
 
 CREATE TABLE tiers_active (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -95,6 +85,8 @@ CREATE TABLE tiers_active (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT valid_purchase_range CHECK (min_purchases < max_purchases)
 );
+
+-- TODO: table uses tier_letter CHAR(1) – that limits to single letters. If more than 26 tiers are needed, you'd need to reconsider.
 
 -- Seed default letter tiers
 INSERT INTO tiers_active (tier_letter, min_purchases, max_purchases) VALUES
@@ -117,9 +109,7 @@ INSERT INTO tiers_active_sub (sub_number, min_spend, max_spend) VALUES
   (1, 15, 30),
   (2, 31, 50);
 
--- =============================================
--- CSV UPLOADS
--- =============================================
+-- CSV Uploads
 
 CREATE TABLE csv_uploads (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -133,9 +123,7 @@ CREATE TABLE csv_uploads (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- =============================================
--- CONTACTS (potential customers)
--- =============================================
+-- Contacts (Potential customers)
 
 CREATE TABLE contacts (
   phone_number VARCHAR(20) PRIMARY KEY,
@@ -149,9 +137,7 @@ CREATE TABLE contacts (
 -- Index for fast tier-based queries (e.g. send SMS to Tier 2)
 CREATE INDEX idx_contacts_potential_tier ON contacts(potential_tier);
 
--- =============================================
--- CUSTOMERS (active — have made at least one purchase)
--- =============================================
+-- Customers (Have made at least one purchase)
 
 CREATE TABLE customers (
   phone_number VARCHAR(20) PRIMARY KEY REFERENCES contacts(phone_number),
@@ -165,9 +151,7 @@ CREATE TABLE customers (
 
 CREATE INDEX idx_customers_tier ON customers(tier_letter, tier_sub_number);
 
--- =============================================
--- PAYMENTS (raw M-Pesa callbacks)
--- =============================================
+-- Payments (Raw M-Pesa callbacks)
 
 CREATE TABLE payments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -189,9 +173,7 @@ CREATE INDEX idx_payments_phone ON payments(phone_number);
 CREATE INDEX idx_payments_status ON payments(status);
 CREATE INDEX idx_payments_resolved ON payments(resolved);
 
--- =============================================
--- PURCHASES (confirmed fulfilled transactions)
--- =============================================
+-- Purchases (Confirmed fulfulled trancsactions)
 
 CREATE TABLE purchases (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -205,9 +187,7 @@ CREATE TABLE purchases (
 CREATE INDEX idx_purchases_phone ON purchases(phone_number);
 CREATE INDEX idx_purchases_package ON purchases(package_id);
 
--- =============================================
--- TIPS
--- =============================================
+-- Tips
 
 CREATE TABLE tips (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -219,10 +199,8 @@ CREATE TABLE tips (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- =============================================
--- TIPS DELIVERY SESSIONS
+-- Tips Delivery Session
 -- Links a set of tips to a specific send event
--- =============================================
 
 CREATE TABLE tips_sessions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -241,9 +219,7 @@ CREATE TABLE tips_session_items (
   tip_id UUID NOT NULL REFERENCES tips(id)
 );
 
--- =============================================
--- OUTBOUND MESSAGES LOG
--- =============================================
+-- Outbound Messages Log
 
 CREATE TABLE messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -259,9 +235,7 @@ CREATE TABLE messages (
 CREATE INDEX idx_messages_phone ON messages(recipient_phone);
 CREATE INDEX idx_messages_status ON messages(status);
 
--- =============================================
--- OUTFLOW (manually entered expenses)
--- =============================================
+-- Outflow (Manually entered expenses)
 
 CREATE TABLE outflow (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

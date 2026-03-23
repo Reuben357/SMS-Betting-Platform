@@ -11,17 +11,21 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD,
 });
 
+const migrations = [
+  '001_initial_schema.sql',
+  '002_schema_updates.sql',
+];
+
 async function migrate() {
   const client = await pool.connect();
   try {
-    const sqlPath = path.join(
-      __dirname,
-      'migrations',
-      '001_initial_schema.sql'
-    );
-    const sql = fs.readFileSync(sqlPath, 'utf8');
-    await client.query(sql);
-    console.log('Migration complete.');
+    for (const filename of migrations) {
+      const filePath = path.join(__dirname, 'migrations', filename);
+      const sql = fs.readFileSync(filePath, 'utf8');
+      await client.query(sql);
+      console.log(` ${filename}`);
+    }
+    console.log('All migrations complete.');
   } catch (err) {
     console.error('Migration failed:', err.message);
     process.exit(1);
@@ -30,5 +34,7 @@ async function migrate() {
     await pool.end();
   }
 }
+
+// TODO: Use a migration tool and a migration table to track which migrations have been run, to support incremental changes later.
 
 migrate();
