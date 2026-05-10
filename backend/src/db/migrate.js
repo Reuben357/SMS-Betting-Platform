@@ -14,6 +14,10 @@ const pool = new Pool({
 const migrations = [
   '001_initial_schema.sql',
   '002_schema_updates.sql',
+  '003_phase2_updates.sql',
+  '004_tips_to_packages.sql',
+  '006_partial_unique_price.sql',
+  '007_add_customer_is_active.sql',
 ];
 
 async function migrate() {

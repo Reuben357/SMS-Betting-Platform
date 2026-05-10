@@ -1,10 +1,27 @@
 "use client";
-
 import { useState, useEffect } from "react";
-import { subscribe, enqueueFiles, clearResults } from "@/lib/uploadService";
+import { subscribe, enqueueFiles } from "@/lib/uploadService";
+import {
+  Upload,
+  X,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  FileSpreadsheet,
+} from "lucide-react";
+
+// Midnight Gold palette
+const BG_DARK = "#1A1A1A";
+const CARD_BG = "#262626";
+const TEXT_PRIMARY = "#FFFFFF";
+const TEXT_SECONDARY = "#A3A3A3";
+const GOLD = "#B3945B";
+const DANGER = "#EF4444";
+const SUCCESS = "#10B981";
 
 export default function UploadForm({ onUploadComplete }) {
   const [files, setFiles] = useState([]);
+  const [isDragging, setIsDragging] = useState(false);
   const [uploadState, setUploadState] = useState({
     active: false,
     currentFile: null,
@@ -13,246 +30,222 @@ export default function UploadForm({ onUploadComplete }) {
     results: [],
   });
 
-  // Subscribe to the upload service on mount.
-  // The service lives outside this component so uploads continue even when the user navigates away.
-  useEffect(() => {
-    const unsubscribe = subscribe(setUploadState);
-    return unsubscribe; // Unsubscribe on unmount — upload keeps running
-  }, []);
+  useEffect(() => subscribe(setUploadState), []);
 
-  function handleFileChange(e) {
-    const selected = Array.from(e.target.files ?? []);
-    setFiles(selected);
-    clearResults();
-  }
+  const handleDrag = (e) => {
+    e.preventDefault();
+    setIsDragging(e.type === "dragover");
+  };
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const dropped = Array.from(e.dataTransfer.files).filter((f) =>
+      f.name.endsWith(".csv"),
+    );
+    setFiles((prev) => [...prev, ...dropped]);
+  };
 
-  function handleUpload() {
-    if (files.length === 0 || uploadState.active) return;
+  const startUpload = () => {
     enqueueFiles(files, onUploadComplete);
     setFiles([]);
-    const input = document.getElementById("csv-file-input");
-    if (input) input.value = "";
-  }
-
-  function handleClear() {
-    setFiles([]);
-    clearResults();
-    const input = document.getElementById("csv-file-input");
-    if (input) input.value = "";
-  }
+  };
 
   const { active, currentFile, currentIndex, totalFiles, results } =
     uploadState;
-  const hasResults = results.length > 0;
-  const totalNew = results.reduce((s, r) => s + (r.new_contacts ?? 0), 0);
-  const totalUpdated = results.reduce(
-    (s, r) => s + (r.updated_contacts ?? 0),
-    0,
-  );
-  const totalRows = results.reduce((s, r) => s + (r.total_rows ?? 0), 0);
-  const totalSkipped = results.reduce((s, r) => s + (r.skipped_rows ?? 0), 0);
 
   return (
-    <div
-      style={{
-        background: "#1e293b",
-        padding: "24px",
-        borderRadius: "8px",
-        border: "1px solid #334155",
-        marginBottom: "24px",
-      }}
-    >
-      <h2
-        style={{
-          fontSize: "15px",
-          fontWeight: 600,
-          marginBottom: "4px",
-          color: "#f1f5f9",
-        }}
-      >
-        Upload Contacts CSV
-      </h2>
-      <p style={{ fontSize: "12px", color: "#64748b", marginBottom: "16px" }}>
-        Select one or more CSV files. Uploads continue even if you navigate
-        away.
-      </p>
-
+    <div style={{ padding: "24px" }}>
+      {/* Drop zone */}
       <div
-        style={{
-          display: "flex",
-          gap: "12px",
-          alignItems: "center",
-          flexWrap: "wrap",
-        }}
+        onDragOver={handleDrag}
+        onDragLeave={() => setIsDragging(false)}
+        onDrop={handleDrop}
+        style={dropZoneStyle(isDragging, active)}
       >
+        <Upload size={32} color={isDragging ? GOLD : TEXT_SECONDARY} />
+        <p
+          style={{
+            margin: "8px 0 0",
+            fontSize: "14px",
+            color: TEXT_SECONDARY,
+            fontWeight: 600,
+          }}
+        >
+          {active ? "Processing..." : "Drag CSV files here"}
+        </p>
         <input
-          id="csv-file-input"
+          id="csv-up"
           type="file"
           accept=".csv"
           multiple
+          onChange={(e) => setFiles(Array.from(e.target.files))}
           style={{ display: "none" }}
-          onChange={handleFileChange}
-          disabled={active}
         />
         <label
-          htmlFor="csv-file-input"
+          htmlFor="csv-up"
           style={{
-            padding: "8px 16px",
-            border: "1px solid #475569",
-            borderRadius: "4px",
-            cursor: active ? "not-allowed" : "pointer",
-            fontSize: "13px",
-            background: "#0f172a",
-            color: active ? "#475569" : "#94a3b8",
-            whiteSpace: "nowrap",
+            color: GOLD,
+            fontSize: "12px",
+            cursor: "pointer",
+            textDecoration: "underline",
           }}
         >
-          {files.length === 0
-            ? "Choose CSV file(s)"
-            : `${files.length} file${files.length > 1 ? "s" : ""} selected`}
+          or browse files
         </label>
-
-        <button
-          onClick={handleUpload}
-          disabled={files.length === 0 || active}
-          style={{
-            padding: "8px 20px",
-            background: files.length > 0 && !active ? "#3b82f6" : "#334155",
-            color: files.length > 0 && !active ? "#fff" : "#64748b",
-            border: "none",
-            borderRadius: "4px",
-            cursor: files.length > 0 && !active ? "pointer" : "not-allowed",
-            fontSize: "14px",
-            fontWeight: 500,
-          }}
-        >
-          {active
-            ? `Uploading ${currentIndex + 1} of ${totalFiles}...`
-            : `Upload${files.length > 1 ? ` (${files.length} files)` : ""}`}
-        </button>
-
-        {(files.length > 0 || hasResults) && !active && (
-          <button
-            onClick={handleClear}
-            style={{
-              padding: "8px 12px",
-              background: "none",
-              border: "1px solid #475569",
-              borderRadius: "4px",
-              cursor: "pointer",
-              fontSize: "13px",
-              color: "#94a3b8",
-            }}
-          >
-            Clear
-          </button>
-        )}
       </div>
 
-      {/* Progress bar */}
-      {active && totalFiles > 0 && (
-        <div style={{ marginTop: "14px" }}>
+      {/* Pending file list (scrollable) */}
+      {files.length > 0 && !active && (
+        <div style={pendingFilesCard}>
           <div
             style={{
-              height: "4px",
-              background: "#334155",
-              borderRadius: "2px",
-              overflow: "hidden",
+              maxHeight: "200px",
+              overflowY: "auto",
+              marginBottom: "12px",
+              paddingRight: "12px",
             }}
           >
-            <div
-              style={{
-                height: "100%",
-                background: "#3b82f6",
-                borderRadius: "2px",
-                width: `${(currentIndex / totalFiles) * 100}%`,
-                transition: "width 0.4s ease",
-              }}
-            />
-          </div>
-          <p style={{ fontSize: "12px", color: "#64748b", marginTop: "6px" }}>
-            Processing: {currentFile}
-            {totalFiles > 1 && ` — ${currentIndex + 1} of ${totalFiles} files`}
-          </p>
-        </div>
-      )}
-
-      {/* Batch summary */}
-      {hasResults && !active && results.length > 1 && (
-        <div
-          style={{
-            marginTop: "16px",
-            padding: "12px",
-            background: "#052e16",
-            border: "1px solid #166534",
-            borderRadius: "6px",
-            fontSize: "13px",
-            color: "#86efac",
-          }}
-        >
-          <strong>
-            Batch complete — {results.filter((r) => r.success).length} of{" "}
-            {results.length} files uploaded
-          </strong>
-          <div
-            style={{
-              marginTop: "8px",
-              display: "flex",
-              gap: "24px",
-              flexWrap: "wrap",
-            }}
-          >
-            {[
-              ["Rows processed", totalRows],
-              ["New contacts", totalNew],
-              ["Updated", totalUpdated],
-              ["Skipped", totalSkipped],
-            ].map(([label, val]) => (
-              <div key={label}>
-                <span style={{ color: "#4ade80" }}>{label}: </span>
-                <strong>{val}</strong>
+            {files.map((f, i) => (
+              <div key={i} style={pendingFileRow}>
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "8px" }}
+                >
+                  <FileSpreadsheet size={14} color={GOLD} /> {f.name}
+                </div>
+                <X
+                  size={14}
+                  cursor="pointer"
+                  color={DANGER}
+                  onClick={() => setFiles(files.filter((_, idx) => idx !== i))}
+                />
               </div>
             ))}
           </div>
+          <button onClick={startUpload} style={submitBtnStyle}>
+            Start Ingestion ({files.length} file{files.length !== 1 ? "s" : ""})
+          </button>
         </div>
       )}
 
-      {/* Per-file results */}
-      {hasResults && (
-        <div style={{ marginTop: results.length > 1 ? "8px" : "16px" }}>
+      {/* Progress bar during upload */}
+      {active && (
+        <div style={progressCard}>
+          <div style={progressHeader}>
+            <Loader2
+              size={16}
+              style={{ animation: "spin 1s linear infinite" }}
+            />{" "}
+            {currentFile}
+          </div>
+          <div style={barBg}>
+            <div style={barFill((currentIndex / totalFiles) * 100)} />
+          </div>
+        </div>
+      )}
+
+      {/* Upload results */}
+      {results.length > 0 && (
+        <div
+          style={{ marginTop: "16px", maxHeight: "160px", overflowY: "auto" }}
+        >
           {results.map((r, i) => (
-            <div
-              key={i}
-              style={{
-                padding: "10px 12px",
-                marginBottom: "6px",
-                borderRadius: "6px",
-                fontSize: "13px",
-                background: r.success ? "#052e16" : "#450a0a",
-                border: `1px solid ${r.success ? "#166534" : "#991b1b"}`,
-                color: r.success ? "#86efac" : "#fca5a5",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <span style={{ fontFamily: "monospace", fontSize: "12px" }}>
+            <div key={i} style={resultRow(r.success)}>
+              {r.success ? (
+                <CheckCircle2 size={14} color={SUCCESS} />
+              ) : (
+                <AlertCircle size={14} color={DANGER} />
+              )}
+              <span style={{ flex: 1, color: r.success ? SUCCESS : DANGER }}>
                 {r.file}
               </span>
-              {r.success ? (
-                <span style={{ fontSize: "12px", color: "#4ade80" }}>
-                  {r.new_contacts} new · {r.updated_contacts} updated ·{" "}
-                  {r.skipped_rows} skipped
-                </span>
-              ) : (
-                <span style={{ fontSize: "12px", color: "#f87171" }}>
-                  {r.error}
-                </span>
-              )}
+              <span
+                style={{ fontWeight: 700, color: r.success ? SUCCESS : DANGER }}
+              >
+                {r.success ? `+${r.new_contacts}` : "Failed"}
+              </span>
             </div>
           ))}
         </div>
       )}
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
+
+// --- Styles ---
+const dropZoneStyle = (isDrag, active) => ({
+  border: `2px dashed ${isDrag ? GOLD : `${GOLD}33`}`,
+  borderRadius: "12px",
+  padding: "32px",
+  textAlign: "center",
+  background: isDrag ? `${GOLD}10` : BG_DARK,
+  opacity: active ? 0.5 : 1,
+});
+
+const pendingFilesCard = {
+  marginTop: "16px",
+  padding: "12px",
+  background: CARD_BG,
+  borderRadius: "8px",
+  border: `1px solid ${GOLD}33`,
+};
+
+const pendingFileRow = {
+  display: "flex",
+  justifyContent: "space-between",
+  fontSize: "12px",
+  color: TEXT_PRIMARY,
+  padding: "8px 0",
+  borderBottom: `1px solid ${GOLD}20`,
+};
+
+const submitBtnStyle = {
+  width: "100%",
+  marginTop: "10px",
+  padding: "10px",
+  background: GOLD,
+  color: BG_DARK,
+  border: "none",
+  borderRadius: "8px",
+  fontWeight: 700,
+  cursor: "pointer",
+};
+
+const progressCard = {
+  marginTop: "16px",
+  padding: "12px",
+  background: `${GOLD}10`,
+  border: `1px solid ${GOLD}33`,
+  borderRadius: "8px",
+};
+
+const progressHeader = {
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+  fontSize: "12px",
+  color: TEXT_PRIMARY,
+  fontWeight: 600,
+  marginBottom: "8px",
+};
+
+const barBg = { height: "6px", background: BG_DARK, borderRadius: "3px" };
+const barFill = (w) => ({
+  height: "100%",
+  width: `${w}%`,
+  background: GOLD,
+  borderRadius: "3px",
+  transition: "width 0.3s",
+});
+
+const resultRow = (s) => ({
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+  padding: "8px 12px",
+  borderRadius: "6px",
+  marginBottom: "4px",
+  background: s ? `${SUCCESS}10` : `${DANGER}10`,
+  border: `1px solid ${s ? SUCCESS : DANGER}40`,
+  fontSize: "11px",
+});

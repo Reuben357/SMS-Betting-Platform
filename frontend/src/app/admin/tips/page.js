@@ -1,547 +1,863 @@
 "use client";
-
-import { useState } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import TopBar from "@/components/TopBar";
+import {
+  Trash2,
+  ChevronDown,
+  ChevronUp,
+  CheckCircle,
+  AlertTriangle,
+  Lock,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 
-const mockTips = [
-  {
-    id: 1,
-    game: "Man Utd vs Arsenal",
-    prediction: "Over 2.5 Goals",
-    date: "Sat 22 Mar, 3:00 PM",
-    status: "pending",
-  },
-  {
-    id: 2,
-    game: "Barcelona vs Real Madrid",
-    prediction: "BTTS",
-    date: "Sat 22 Mar, 8:00 PM",
-    status: "won",
-  },
-  {
-    id: 3,
-    game: "Liverpool vs Chelsea",
-    prediction: "Home Win",
-    date: "Sun 23 Mar, 2:00 PM",
-    status: "lost",
-  },
-  {
-    id: 4,
-    game: "PSG vs Bayern",
-    prediction: "Over 3.5 Goals",
-    date: "Sun 23 Mar, 8:00 PM",
-    status: "pending",
-  },
-];
+// Midnight Gold color palette
+const BG_DARK = "#1A1A1A";
+const CARD_BG = "#262626";
+const TEXT_PRIMARY = "#FFFFFF";
+const TEXT_SECONDARY = "#A3A3A3";
+const GOLD = "#B3945B";
+const GOLD_LIGHT = "#D4AF6A";
+const DANGER = "#EF4444";
+const SUCCESS = "#10B981";
+const WARNING = "#F59E0B";
 
-const statusColor = { pending: "#f59e0b", won: "#34d399", lost: "#f87171" };
-const statusBg = { pending: "#451a0322", won: "#052e1622", lost: "#450a0a22" };
+// Confirmation Modal Component (Midnight Gold theme)
+function ConfirmModal({ isOpen, onClose, onConfirm, tipName }) {
+  if (!isOpen) return null;
 
-const sectionStyle = {
-  background: "#1e293b",
-  border: "1px solid #334155",
+  return (
+    <div style={modalOverlayStyle} onClick={onClose}>
+      <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
+        <div style={modalHeaderStyle}>
+          <AlertTriangle size={20} color={DANGER} />
+          <span style={modalTitleStyle}>Delete Tip</span>
+        </div>
+        <div style={modalBodyStyle}>
+          Delete tip <strong>{tipName}</strong>? This cannot be undone.
+        </div>
+        <div style={modalFooterStyle}>
+          <button style={modalCancelBtn} onClick={onClose}>
+            Cancel
+          </button>
+          <button style={modalConfirmBtn} onClick={onConfirm}>
+            OK, Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const modalOverlayStyle = {
+  position: "fixed",
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: "rgba(0,0,0,0.7)",
+  backdropFilter: "blur(3px)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  zIndex: 1000,
+};
+
+const modalContentStyle = {
+  background: CARD_BG,
+  borderRadius: "16px",
+  border: `1px solid ${GOLD}33`,
+  boxShadow: "0 8px 20px rgba(0,0,0,0.5)",
+  width: "360px",
+  maxWidth: "90%",
+  overflow: "hidden",
+};
+
+const modalHeaderStyle = {
+  padding: "16px 20px",
+  background: `${DANGER}10`,
+  borderBottom: `1px solid ${DANGER}40`,
+  display: "flex",
+  alignItems: "center",
+  gap: "10px",
+};
+
+const modalTitleStyle = {
+  fontSize: "16px",
+  fontWeight: 800,
+  color: DANGER,
+  letterSpacing: "0.02em",
+};
+
+const modalBodyStyle = {
+  padding: "24px 20px",
+  fontSize: "14px",
+  color: TEXT_PRIMARY,
+  lineHeight: 1.5,
+  borderBottom: `1px solid ${GOLD}33`,
+};
+
+const modalFooterStyle = {
+  padding: "16px 20px",
+  display: "flex",
+  justifyContent: "flex-end",
+  gap: "12px",
+  background: BG_DARK,
+};
+
+const modalCancelBtn = {
+  background: "transparent",
+  border: `1px solid ${GOLD}33`,
   borderRadius: "8px",
-  marginBottom: "20px",
-};
-
-const inputStyle = {
-  width: "100%",
-  padding: "8px 10px",
-  border: "1px solid #475569",
-  borderRadius: "4px",
-  fontSize: "13px",
-  background: "#0f172a",
-  color: "#f1f5f9",
-  boxSizing: "border-box",
-};
-
-const btnPrimary = {
-  padding: "8px 20px",
-  background: "#3b82f6",
-  color: "#fff",
-  border: "none",
-  borderRadius: "4px",
+  padding: "8px 16px",
+  fontSize: "12px",
+  fontWeight: 700,
+  color: TEXT_SECONDARY,
   cursor: "pointer",
-  fontSize: "13px",
-  fontWeight: 500,
+  transition: "all 0.2s",
+};
+
+const modalConfirmBtn = {
+  background: DANGER,
+  border: "none",
+  borderRadius: "8px",
+  padding: "8px 16px",
+  fontSize: "12px",
+  fontWeight: 700,
+  color: TEXT_PRIMARY,
+  cursor: "pointer",
+  transition: "all 0.2s",
 };
 
 export default function TipsPage() {
-  const [activeTab, setActiveTab] = useState("display");
-  const [tips] = useState(mockTips);
-  const [form, setForm] = useState({ game: "", prediction: "", date: "" });
-  const [adMsg, setAdMsg] = useState("");
-  const [deliveryMsg, setDeliveryMsg] = useState("");
-  const [confirmMsg, setConfirmMsg] = useState("");
+  const [tips, setTips] = useState([]);
+  const [packages, setPackages] = useState([]);
+  const [form, setForm] = useState({
+    game_name: "",
+    prediction: "",
+    match_datetime: "",
+    package_id: "",
+  });
+  const [expanded, setExpanded] = useState({});
+  const [stats, setStats] = useState({ won: 0, lost: 0, winRate: 0 });
+  const [notification, setNotification] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [packageCapacity, setPackageCapacity] = useState({});
 
-  const won = tips.filter((t) => t.status === "won").length;
-  const settled = tips.filter((t) => t.status !== "pending").length;
-  const accuracy = settled > 0 ? Math.round((won / settled) * 100) : 0;
+   // NEW pagination states (client-side pagination for packages)
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(5);           // packages per page
+  const [gotoPage, setGotoPage] = useState("");
 
-  const tabs = [
-    { id: "display", label: "Tips Display" },
-    { id: "input", label: "Tips Input" },
-    { id: "outcome", label: "Win/Loss Outcome" },
-    { id: "advert", label: "Advertising SMS" },
-    { id: "delivery", label: "Tips Delivery Message" },
-    { id: "confirm", label: "Payment Confirmation" },
-  ];
+  // Modal state
+  const [modalOpen, setModalOpen] = useState(false);
+  const [tipToDelete, setTipToDelete] = useState(null);
+
+  // Auto-hide notification after 4 seconds
+  useEffect(() => {
+    if (notification) {
+      const t = setTimeout(() => setNotification(null), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [notification]);
+
+  // Fetch all tips
+  const fetchTips = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/proxy/tips");
+      const data = await res.json();
+      const fetchedTips = data.tips ?? [];
+      setTips(fetchedTips);
+
+      const won = fetchedTips.filter((t) => t.status === "won").length;
+      const lost = fetchedTips.filter((t) => t.status === "lost").length;
+      const settled = won + lost;
+      setStats({
+        won,
+        lost,
+        winRate: settled > 0 ? ((won / settled) * 100).toFixed(1) : 0,
+      });
+
+      const capacity = {};
+      fetchedTips.forEach((tip) => {
+        if (!capacity[tip.package_id]) capacity[tip.package_id] = 0;
+        capacity[tip.package_id]++;
+      });
+      setPackageCapacity(capacity);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Fetch active packages
+  useEffect(() => {
+    fetch("/api/proxy/packages")
+      .then((r) => r.json())
+      .then((d) => setPackages((d.packages ?? []).filter((p) => p.is_active)));
+    fetchTips();
+  }, [fetchTips]);
+
+  const selectedPkg = packages.find((p) => p.id === form.package_id);
+  const currentCount = packageCapacity[form.package_id] ?? 0;
+  const maxCount = selectedPkg?.game_count ?? 0;
+  const isFull = form.package_id && maxCount > 0 && currentCount >= maxCount;
+  const isNearFull =
+    form.package_id && maxCount > 0 && currentCount === maxCount - 1;
+  
+     // Group tips by package name
+  const grouped = tips.reduce((acc, tip) => {
+    const key = tip.package_name || "Uncategorized";
+    if (!acc[key]) acc[key] = { tips: [], package_id: tip.package_id };
+    acc[key].tips.push(tip);
+    return acc;
+  }, {});
+  
+   // NEW: Convert grouped object to array of [packageName, group] for pagination
+  const packageEntries = Object.entries(grouped);
+  const totalPackages = packageEntries.length;
+  const totalPages = Math.ceil(totalPackages / limit);
+  const start = (page - 1) * limit;
+  const paginatedEntries = packageEntries.slice(start, start + limit);
+
+  // Helper to generate page numbers (with ellipsis)
+  const getPageNumbers = () => {
+    const total = totalPages;
+    const current = page;
+    const delta = 2;
+    let range = [];
+    for (
+      let i = Math.max(2, current - delta);
+      i <= Math.min(total - 1, current + delta);
+      i++
+    ) {
+      range.push(i);
+    }
+    if (current - delta > 2) range.unshift("...");
+    if (current + delta < total - 1) range.push("...");
+    range.unshift(1);
+    if (total !== 1) range.push(total);
+    return [...new Set(range)];
+  };
+
+  // Reset page when packages change (e.g. after adding a tip)
+  useEffect(() => {
+    setPage(1);
+  }, [tips]); // whenever tips change, the grouped object changes
+
+  // Reset page when limit changes
+  useEffect(() => {
+    setPage(1);
+  }, [limit]);
+
+  const handleGoToPage = () => {
+    const pageNum = parseInt(gotoPage);
+    if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= totalPages) {
+      setPage(pageNum);
+      setGotoPage("");
+    }
+  };
+
+
+  async function handleCreate() {
+    if (
+      !form.game_name ||
+      !form.prediction ||
+      !form.match_datetime ||
+      !form.package_id
+    ) {
+      setNotification({
+        type: "error",
+        text: "All fields are required before adding a tip.",
+      });
+      return;
+    }
+
+    if (isFull) {
+      setNotification({
+        type: "error",
+        text: `"${selectedPkg?.name}" is full (${currentCount}/${maxCount} tips). Remove a tip or increase the game count first.`,
+      });
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/proxy/tips", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setNotification({
+          type: "error",
+          text: data.error || "Failed to add tip.",
+        });
+        return;
+      }
+
+      setNotification({
+        type: "success",
+        text: "Tip added to package successfully.",
+      });
+      setForm({
+        game_name: "",
+        prediction: "",
+        match_datetime: "",
+        package_id: form.package_id,
+      });
+      fetchTips();
+    } catch (err) {
+      setNotification({
+        type: "error",
+        text: "Network error. Please try again.",
+      });
+    }
+  }
+
+  async function handleOutcome(id, status) {
+    try {
+      const res = await fetch(`/api/proxy/tips/${id}/outcome`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) {
+        setNotification({ type: "error", text: "Failed to update outcome." });
+        return;
+      }
+      fetchTips();
+    } catch {
+      setNotification({
+        type: "error",
+        text: "Network error updating outcome.",
+      });
+    }
+  }
+
+  // Open confirmation modal instead of native confirm
+  const openDeleteModal = (id, gameName) => {
+    setTipToDelete({ id, gameName });
+    setModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!tipToDelete) return;
+    const { id, gameName } = tipToDelete;
+    try {
+      await fetch(`/api/proxy/tips/${id}`, { method: "DELETE" });
+      setNotification({ type: "success", text: `Tip "${gameName}" removed.` });
+      fetchTips();
+    } catch {
+      setNotification({ type: "error", text: "Failed to delete tip." });
+    } finally {
+      setModalOpen(false);
+      setTipToDelete(null);
+    }
+  };
+
+  const cancelDelete = () => {
+    setModalOpen(false);
+    setTipToDelete(null);
+  };
+
+  const toggle = (key) =>
+    setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
 
   return (
-    <>
-      <TopBar title="Tips" />
-      <div style={{ padding: "24px 32px", maxWidth: "1000px" }}>
-        {/* Accuracy summary */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
-            gap: "16px",
-            marginBottom: "24px",
-          }}
-        >
-          {[
-            { label: "Total Tips", value: tips.length, color: "#3b82f6" },
-            { label: "Win Rate", value: `${accuracy}%`, color: "#34d399" },
-            {
-              label: "Active Tips",
-              value: tips.filter((t) => t.status === "pending").length,
-              color: "#f59e0b",
-            },
-          ].map(({ label, value, color }) => (
-            <div
-              key={label}
-              style={{
-                background: "#1e293b",
-                border: "1px solid #334155",
-                borderRadius: "8px",
-                padding: "20px",
-                textAlign: "center",
-              }}
-            >
-              <div style={{ fontSize: "28px", fontWeight: 700, color }}>
-                {value}
-              </div>
-              <div
-                style={{ fontSize: "12px", color: "#64748b", marginTop: "4px" }}
-              >
-                {label}
-              </div>
+    <div style={styles.pageWrapper}>
+      <TopBar title="Tips Management" />
+      <div style={styles.content}>
+        {/* Statistics row */}
+        <div style={styles.statsRow}>
+          <div style={styles.statCard}>
+            <span style={styles.statLabel}>WIN RATE</span>
+            <div style={{ ...styles.statValue, color: GOLD }}>
+              {stats.winRate}%
             </div>
-          ))}
-        </div>
-
-        {/* Tab navigation */}
-        <div
-          style={{
-            display: "flex",
-            gap: "4px",
-            marginBottom: "20px",
-            borderBottom: "1px solid #334155",
-            paddingBottom: "0",
-            overflowX: "auto",
-          }}
-        >
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setActiveTab(t.id)}
-              style={{
-                padding: "8px 16px",
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                fontSize: "13px",
-                whiteSpace: "nowrap",
-                color: activeTab === t.id ? "#3b82f6" : "#64748b",
-                fontWeight: activeTab === t.id ? 600 : 400,
-                borderBottom:
-                  activeTab === t.id
-                    ? "2px solid #3b82f6"
-                    : "2px solid transparent",
-              }}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Display tab */}
-        {activeTab === "display" && (
-          <div style={sectionStyle}>
-            <div
-              style={{
-                padding: "16px 20px",
-                borderBottom: "1px solid #334155",
-              }}
-            >
-              <h3
-                style={{ fontSize: "14px", fontWeight: 600, color: "#f1f5f9" }}
-              >
-                Current Tips
-              </h3>
-            </div>
-            {tips.map((tip) => (
-              <div
-                key={tip.id}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "2fr 1fr 1fr 100px",
-                  gap: "16px",
-                  padding: "12px 20px",
-                  alignItems: "center",
-                  borderBottom: "1px solid #1e293b",
-                  fontSize: "13px",
-                }}
-              >
-                <div>
-                  <div style={{ color: "#f1f5f9", fontWeight: 500 }}>
-                    {tip.game}
-                  </div>
-                  <div
-                    style={{
-                      color: "#64748b",
-                      fontSize: "12px",
-                      marginTop: "2px",
-                    }}
-                  >
-                    {tip.prediction}
-                  </div>
-                </div>
-                <div style={{ color: "#64748b", fontSize: "12px" }}>
-                  {tip.date}
-                </div>
-                <div style={{ color: "#64748b", fontSize: "12px" }}>–</div>
-                <div>
-                  <span
-                    style={{
-                      padding: "3px 10px",
-                      borderRadius: "20px",
-                      fontSize: "11px",
-                      fontWeight: 600,
-                      background: statusBg[tip.status],
-                      color: statusColor[tip.status],
-                      border: `1px solid ${statusColor[tip.status]}44`,
-                      textTransform: "capitalize",
-                    }}
-                  >
-                    {tip.status}
-                  </span>
-                </div>
-              </div>
-            ))}
           </div>
-        )}
-
-        {/* Tips Input tab */}
-        {activeTab === "input" && (
-          <div style={{ ...sectionStyle, padding: "24px" }}>
-            <h3
-              style={{
-                fontSize: "14px",
-                fontWeight: 600,
-                color: "#f1f5f9",
-                marginBottom: "16px",
-              }}
-            >
-              Add Today's Tips
-            </h3>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "12px",
-                marginBottom: "12px",
-              }}
-            >
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: "12px",
-                    color: "#94a3b8",
-                    marginBottom: "4px",
-                  }}
-                >
-                  Game
-                </label>
-                <input
-                  style={inputStyle}
-                  placeholder="e.g. Man Utd vs Arsenal"
-                  value={form.game}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, game: e.target.value }))
-                  }
-                />
-              </div>
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: "12px",
-                    color: "#94a3b8",
-                    marginBottom: "4px",
-                  }}
-                >
-                  Prediction
-                </label>
-                <input
-                  style={inputStyle}
-                  placeholder="e.g. Over 2.5 Goals"
-                  value={form.prediction}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, prediction: e.target.value }))
-                  }
-                />
-              </div>
+          <div style={styles.statCard}>
+            <span style={styles.statLabel}>SETTLED (W / L)</span>
+            <div style={styles.statValue}>
+              {stats.won} <span style={{ color: TEXT_SECONDARY }}>/</span>{" "}
+              {stats.lost}
             </div>
-            <div style={{ marginBottom: "16px" }}>
-              <label
+          </div>
+        </div>
+
+        {/* Add Tip Form */}
+        <div style={styles.formContainer}>
+          <h3 style={styles.formTitle}>Add New Tip</h3>
+          <div style={styles.grid}>
+            <input
+              style={styles.input}
+              placeholder="Game / Match name"
+              value={form.game_name}
+              onChange={(e) => setForm({ ...form, game_name: e.target.value })}
+            />
+            <input
+              style={styles.input}
+              placeholder="Prediction (e.g. Home Win)"
+              value={form.prediction}
+              onChange={(e) => setForm({ ...form, prediction: e.target.value })}
+            />
+            <input
+              type="datetime-local"
+              style={styles.input}
+              value={form.match_datetime}
+              onChange={(e) =>
+                setForm({ ...form, match_datetime: e.target.value })
+              }
+            />
+            <div style={{ position: "relative" }}>
+              <select
                 style={{
-                  display: "block",
-                  fontSize: "12px",
-                  color: "#94a3b8",
-                  marginBottom: "4px",
+                  ...styles.input,
+                  borderColor: isFull ? DANGER : `${GOLD}33`,
+                  paddingRight: isFull ? "32px" : "12px",
                 }}
-              >
-                Match Date & Time
-              </label>
-              <input
-                type="datetime-local"
-                style={{ ...inputStyle, width: "240px" }}
-                value={form.date}
+                value={form.package_id}
                 onChange={(e) =>
-                  setForm((f) => ({ ...f, date: e.target.value }))
+                  setForm({ ...form, package_id: e.target.value })
                 }
-              />
+              >
+                <option value="">Select Package</option>
+                {packages.map((p) => {
+                  const count = packageCapacity[p.id] ?? 0;
+                  const full = count >= p.game_count;
+                  return (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({count}/{p.game_count} tips)
+                      {full ? " — FULL" : ""}
+                    </option>
+                  );
+                })}
+              </select>
+              {isFull && (
+                <Lock
+                  size={14}
+                  style={{
+                    position: "absolute",
+                    right: "10px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    color: DANGER,
+                  }}
+                />
+              )}
             </div>
-            <button style={btnPrimary}>Save Tip</button>
           </div>
-        )}
 
-        {/* Win/Loss tab */}
-        {activeTab === "outcome" && (
-          <div style={sectionStyle}>
+          {form.package_id && maxCount > 0 && (
             <div
               style={{
-                padding: "16px 20px",
-                borderBottom: "1px solid #334155",
+                marginTop: "12px",
+                padding: "10px 14px",
+                borderRadius: "8px",
+                fontSize: "12px",
+                fontWeight: 700,
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                background: isFull
+                  ? `${DANGER}20`
+                  : isNearFull
+                    ? `${WARNING}20`
+                    : `${SUCCESS}20`,
+                color: isFull ? DANGER : isNearFull ? WARNING : SUCCESS,
+                border: `1px solid ${isFull ? DANGER : isNearFull ? WARNING : SUCCESS}40`,
               }}
             >
-              <h3
-                style={{ fontSize: "14px", fontWeight: 600, color: "#f1f5f9" }}
-              >
-                Record Outcomes
-              </h3>
+              {isFull ? <Lock size={13} /> : <AlertTriangle size={13} />}
+              {isFull
+                ? `Package is full (${currentCount}/${maxCount}). Cannot add more tips.`
+                : isNearFull
+                  ? `Almost full — 1 slot remaining (${currentCount}/${maxCount}).`
+                  : `${maxCount - currentCount} slot${maxCount - currentCount !== 1 ? "s" : ""} available (${currentCount}/${maxCount}).`}
             </div>
-            {tips
-              .filter((t) => t.status === "pending")
-              .map((tip) => (
-                <div
-                  key={tip.id}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "12px 20px",
-                    borderBottom: "1px solid #1e293b",
-                    fontSize: "13px",
-                  }}
-                >
-                  <div>
-                    <div style={{ color: "#f1f5f9" }}>{tip.game}</div>
-                    <div style={{ color: "#64748b", fontSize: "12px" }}>
-                      {tip.prediction}
-                    </div>
+          )}
+
+          <button
+            style={{
+              ...styles.addBtn,
+              opacity: isFull ? 0.5 : 1,
+              cursor: isFull ? "not-allowed" : "pointer",
+            }}
+            onClick={handleCreate}
+            disabled={isFull}
+          >
+            {isFull ? "Package Full" : "Add Tip to Package"}
+          </button>
+
+          {notification && (
+            <div
+              style={{
+                ...styles.toast,
+                background:
+                  notification.type === "success"
+                    ? SUCCESS
+                    : notification.type === "warning"
+                      ? WARNING
+                      : DANGER,
+                color: notification.type === "success" ? BG_DARK : TEXT_PRIMARY,
+              }}
+            >
+              {notification.type === "success" ? (
+                <CheckCircle size={15} />
+              ) : (
+                <AlertTriangle size={15} />
+              )}
+              {notification.text}
+            </div>
+          )}
+        </div>
+
+        {/* Tips List */}
+        <div style={styles.archiveContainer}>
+          {paginatedEntries.map(([name, group]) => {
+            const pkgObj = packages.find((p) => p.id === group.package_id);
+            const count = group.tips.length;
+            const max = pkgObj?.game_count ?? "?";
+            const full = pkgObj && count >= pkgObj.game_count;
+
+            return (
+              <div key={name} style={styles.bundleCard}>
+                <div style={styles.bundleHeader} onClick={() => toggle(name)}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <span style={styles.bundleTitle}>{name}</span>
+                    <span
+                      style={{
+                        fontSize: "10px",
+                        fontWeight: 800,
+                        padding: "2px 8px",
+                        borderRadius: "10px",
+                        background: full ? `${DANGER}20` : `${GOLD}20`,
+                        color: full ? DANGER : GOLD,
+                      }}
+                    >
+                      {count}/{max} {full ? "FULL" : "tips"}
+                    </span>
                   </div>
-                  <div style={{ display: "flex", gap: "8px" }}>
-                    <button style={{ ...btnPrimary, background: "#16a34a" }}>
-                      Won
-                    </button>
-                    <button style={{ ...btnPrimary, background: "#dc2626" }}>
-                      Lost
-                    </button>
-                  </div>
+                  {expanded[name] ? <ChevronUp color={GOLD} size={18} /> : <ChevronDown color={GOLD} size={18} />}
                 </div>
-              ))}
-            {tips.filter((t) => t.status === "pending").length === 0 && (
-              <div
-                style={{
-                  padding: "32px",
-                  textAlign: "center",
-                  color: "#475569",
-                }}
-              >
-                No pending tips to record outcomes for.
+                {expanded[name] &&
+                  group.tips.map((tip) => (
+                    <div key={tip.id} style={styles.tipRow}>
+                      <div style={{ flex: 2 }}>
+                        <div style={styles.gameTitle}>{tip.game_name}</div>
+                        <div style={styles.subText}>{new Date(tip.match_datetime).toLocaleString()}</div>
+                      </div>
+                      <div style={{ flex: 1, color: GOLD, fontWeight: 600, fontSize: "13px" }}>{tip.prediction}</div>
+                      <div style={{ flex: 1, textAlign: "center" }}>
+                        <span style={statusBadge(tip.status)}>{tip.status.toUpperCase()}</span>
+                      </div>
+                      <div style={styles.actionGroup}>
+                        <button onClick={() => handleOutcome(tip.id, "won")} style={outcomeBtn("won")} title="Mark Won">W</button>
+                        <button onClick={() => handleOutcome(tip.id, "lost")} style={outcomeBtn("lost")} title="Mark Lost">L</button>
+                        <button onClick={() => openDeleteModal(tip.id, tip.game_name)} style={styles.delBtn} title="Delete tip"><Trash2 size={13} /></button>
+                      </div>
+                    </div>
+                  ))}
               </div>
-            )}
-          </div>
-        )}
+            );
+          })}
 
-        {/* Advertising SMS tab */}
-        {activeTab === "advert" && (
-          <div style={{ ...sectionStyle, padding: "24px" }}>
-            <h3
-              style={{
-                fontSize: "14px",
-                fontWeight: 600,
-                color: "#f1f5f9",
-                marginBottom: "4px",
-              }}
-            >
-              Advertising SMS
-            </h3>
-            <p
-              style={{
-                fontSize: "12px",
-                color: "#64748b",
-                marginBottom: "16px",
-              }}
-            >
-              Tips and delivery message must be saved before this can be sent.
-            </p>
-            <div style={{ marginBottom: "12px" }}>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: "12px",
-                  color: "#94a3b8",
-                  marginBottom: "4px",
-                }}
-              >
-                Target Tier
-              </label>
-              <select style={{ ...inputStyle, width: "200px" }}>
-                <option>All contacts</option>
-                <option>Tier 1</option>
-                <option>Tier 2</option>
-                <option>Specific number</option>
-              </select>
+          {totalPackages === 0 && !loading && (
+            <div style={{ textAlign: "center", padding: "60px", color: TEXT_SECONDARY, fontSize: "14px" }}>
+              No active tips. Add a tip above to get started.
             </div>
-            <div style={{ marginBottom: "16px" }}>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: "12px",
-                  color: "#94a3b8",
-                  marginBottom: "4px",
-                }}
-              >
-                Message{" "}
-                <span style={{ color: "#475569" }}>({adMsg.length} chars)</span>
-              </label>
-              <textarea
-                rows={8}
-                style={{
-                  ...inputStyle,
-                  resize: "vertical",
-                  fontFamily: "monospace",
-                }}
-                value={adMsg}
-                onChange={(e) => setAdMsg(e.target.value)}
-                placeholder="BETWISE TIPSTERS&#10;Saturday Banker - EPL&#10;&#10;PACKAGES&#10;A: 4 Tips - KES 50&#10;B: 8 Tips - KES 100&#10;&#10;Pay: M-Pesa Buy Goods&#10;Till: 441717"
-              />
-            </div>
-            <button style={btnPrimary}>Send to Selected Tier</button>
-          </div>
-        )}
+          )}
 
-        {/* Tips Delivery tab */}
-        {activeTab === "delivery" && (
-          <div style={{ ...sectionStyle, padding: "24px" }}>
-            <h3
-              style={{
-                fontSize: "14px",
-                fontWeight: 600,
-                color: "#f1f5f9",
-                marginBottom: "16px",
-              }}
-            >
-              Tips Delivery Message
-            </h3>
-            <div style={{ marginBottom: "16px" }}>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: "12px",
-                  color: "#94a3b8",
-                  marginBottom: "4px",
-                }}
-              >
-                Message sent to customer after payment{" "}
-                <span style={{ color: "#475569" }}>
-                  ({deliveryMsg.length} chars)
-                </span>
-              </label>
-              <textarea
-                rows={6}
-                style={{
-                  ...inputStyle,
-                  resize: "vertical",
-                  fontFamily: "monospace",
-                }}
-                value={deliveryMsg}
-                onChange={(e) => setDeliveryMsg(e.target.value)}
-                placeholder="Your tips for tonight:&#10;1. Man Utd vs Arsenal - Over 2.5 Goals&#10;2. Barcelona vs Madrid - BTTS&#10;Good luck!"
-              />
-            </div>
-            <button style={btnPrimary}>Save Delivery Message</button>
-          </div>
-        )}
+          {/* NEW Enhanced Pagination (shown only if more than 1 page) */}
+          {totalPages > 1 && (
+            <div style={paginationContainer}>
+              <div style={paginationControls}>
+                <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} style={paginationButton}>
+                  <ChevronLeft size={16} /> Prev
+                </button>
+                {getPageNumbers().map((item, idx) =>
+                  item === "..." ? (
+                    <span key={`ellipsis-${idx}`} style={paginationEllipsis}>…</span>
+                  ) : (
+                    <button
+                      key={item}
+                      onClick={() => setPage(item)}
+                      style={{
+                        ...paginationButton,
+                        background: page === item ? GOLD : "transparent",
+                        color: page === item ? BG_DARK : GOLD,
+                        borderColor: GOLD,
+                      }}
+                    >
+                      {item}
+                    </button>
+                  )
+                )}
+                <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={paginationButton}>
+                  Next <ChevronRight size={16} />
+                </button>
+              </div>
 
-        {/* Payment Confirmation tab */}
-        {activeTab === "confirm" && (
-          <div style={{ ...sectionStyle, padding: "24px" }}>
-            <h3
-              style={{
-                fontSize: "14px",
-                fontWeight: 600,
-                color: "#f1f5f9",
-                marginBottom: "4px",
-              }}
-            >
-              Payment Confirmation Message
-            </h3>
-            <p
-              style={{
-                fontSize: "12px",
-                color: "#64748b",
-                marginBottom: "16px",
-              }}
-            >
-              Optional. Sent immediately after payment is confirmed, before tips
-              are delivered.
-            </p>
-            <div style={{ marginBottom: "16px" }}>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: "12px",
-                  color: "#94a3b8",
-                  marginBottom: "4px",
-                }}
-              >
-                Message{" "}
-                <span style={{ color: "#475569" }}>
-                  ({confirmMsg.length} chars)
-                </span>
-              </label>
-              <textarea
-                rows={4}
-                style={{
-                  ...inputStyle,
-                  resize: "vertical",
-                  fontFamily: "monospace",
-                }}
-                value={confirmMsg}
-                onChange={(e) => setConfirmMsg(e.target.value)}
-                placeholder="Thank you! Your payment of KES {amount} has been received. Your tips are on the way."
-              />
+              <div style={paginationSide}>
+                <select value={limit} onChange={(e) => setLimit(Number(e.target.value))} style={limitSelect}>
+                  {[5, 10, 15, 20, 30].map((num) => <option key={num} value={num}>{num} / page</option>)}
+                </select>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontSize: "12px", color: TEXT_SECONDARY }}>Go to</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max={totalPages}
+                    value={gotoPage}
+                    onChange={(e) => setGotoPage(e.target.value)}
+                    onKeyPress={(e) => e.key === "Enter" && handleGoToPage()}
+                    style={gotoInput}
+                  />
+                  <button onClick={handleGoToPage} style={gotoButton}>Page</button>
+                </div>
+              </div>
             </div>
-            <button style={btnPrimary}>Save Confirmation Message</button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </>
+
+      {/* Custom Confirmation Modal */}
+      <ConfirmModal
+        isOpen={modalOpen}
+        onClose={cancelDelete}
+        onConfirm={confirmDelete}
+        tipName={tipToDelete?.gameName || ""}
+      />
+    </div>
   );
 }
+
+// Styles object (unchanged except added modal styles – already defined above)
+const styles = {
+  pageWrapper: { background: BG_DARK, minHeight: "100vh" },
+  content: { padding: "30px", maxWidth: "1200px", margin: "0 auto" },
+  statsRow: { display: "flex", gap: "20px", marginBottom: "30px" },
+  statCard: {
+    background: CARD_BG,
+    padding: "20px",
+    borderRadius: "12px",
+    flex: 1,
+    border: `1px solid ${GOLD}33`,
+    boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+  },
+  statLabel: {
+    fontSize: "11px",
+    fontWeight: 800,
+    color: TEXT_SECONDARY,
+    letterSpacing: "0.05em",
+  },
+  statValue: {
+    fontSize: "24px",
+    fontWeight: 700,
+    color: TEXT_PRIMARY,
+    marginTop: "4px",
+  },
+  formContainer: {
+    background: CARD_BG,
+    padding: "24px",
+    borderRadius: "16px",
+    border: `1px solid ${GOLD}33`,
+    marginBottom: "30px",
+    position: "relative",
+  },
+  formTitle: {
+    fontSize: "16px",
+    fontWeight: 700,
+    color: GOLD,
+    marginBottom: "20px",
+  },
+  grid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+    gap: "15px",
+  },
+  input: {
+    padding: "12px",
+    border: `1px solid ${GOLD}33`,
+    borderRadius: "8px",
+    fontSize: "14px",
+    background: BG_DARK,
+    color: TEXT_PRIMARY,
+    width: "100%",
+    boxSizing: "border-box",
+  },
+  addBtn: {
+    marginTop: "16px",
+    background: GOLD,
+    color: BG_DARK,
+    border: "none",
+    padding: "12px 24px",
+    borderRadius: "8px",
+    fontWeight: 700,
+    fontSize: "14px",
+    transition: "opacity 0.2s",
+  },
+  archiveContainer: { maxWidth: "900px" },
+  bundleCard: {
+    background: CARD_BG,
+    borderRadius: "12px",
+    border: `1px solid ${GOLD}33`,
+    marginBottom: "16px",
+    overflow: "hidden",
+  },
+  bundleHeader: {
+    padding: "16px 20px",
+    background: `${GOLD}10`,
+    display: "flex",
+    justifyContent: "space-between",
+    cursor: "pointer",
+    borderBottom: `1px solid ${GOLD}33`,
+    alignItems: "center",
+  },
+  bundleTitle: { fontWeight: 700, color: GOLD, fontSize: "14px" },
+  tipRow: {
+    display: "flex",
+    padding: "16px 20px",
+    borderBottom: `1px solid ${GOLD}20`,
+    alignItems: "center",
+    fontSize: "14px",
+  },
+  gameTitle: { fontWeight: 700, color: TEXT_PRIMARY },
+  subText: { fontSize: "12px", color: TEXT_SECONDARY, marginTop: "2px" },
+  actionGroup: {
+    display: "flex",
+    gap: "8px",
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  delBtn: {
+    background: "none",
+    border: `1px solid ${GOLD}33`,
+    color: TEXT_SECONDARY,
+    padding: "6px",
+    borderRadius: "6px",
+    cursor: "pointer",
+  },
+  toast: {
+    position: "absolute",
+    bottom: "-18px",
+    right: "24px",
+    padding: "8px 16px",
+    borderRadius: "20px",
+    fontSize: "12px",
+    fontWeight: 700,
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+  },
+};
+
+const outcomeBtn = (type) => ({
+  padding: "6px 12px",
+  borderRadius: "6px",
+  border: "none",
+  fontWeight: 800,
+  fontSize: "11px",
+  cursor: "pointer",
+  background: type === "won" ? `${SUCCESS}20` : `${DANGER}20`,
+  color: type === "won" ? SUCCESS : DANGER,
+});
+
+const statusBadge = (s) => ({
+  padding: "4px 10px",
+  borderRadius: "20px",
+  fontSize: "11px",
+  fontWeight: 800,
+  background:
+    s === "won"
+      ? `${SUCCESS}20`
+      : s === "lost"
+        ? `${DANGER}20`
+        : `${TEXT_SECONDARY}20`,
+  color: s === "won" ? SUCCESS : s === "lost" ? DANGER : TEXT_SECONDARY,
+});
+
+const paginationContainer = {
+  marginTop: "32px",
+  display: "flex",
+  flexWrap: "wrap",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "16px",
+  padding: "16px 0",
+  borderTop: `1px solid ${GOLD}33`,
+};
+
+const paginationControls = {
+  display: "flex",
+  gap: "8px",
+  alignItems: "center",
+  flexWrap: "wrap",
+};
+
+const paginationButton = {
+  padding: "6px 12px",
+  border: `1px solid ${GOLD}`,
+  borderRadius: "6px",
+  background: "transparent",
+  color: GOLD,
+  fontSize: "13px",
+  fontWeight: 600,
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "4px",
+  transition: "all 0.2s",
+};
+
+const paginationEllipsis = {
+  padding: "6px 8px",
+  color: TEXT_SECONDARY,
+  fontSize: "14px",
+};
+
+const paginationSide = {
+  display: "flex",
+  gap: "16px",
+  alignItems: "center",
+  flexWrap: "wrap",
+};
+
+const limitSelect = {
+  padding: "6px 10px",
+  borderRadius: "6px",
+  border: `1px solid ${GOLD}`,
+  background: BG_DARK,
+  color: TEXT_PRIMARY,
+  fontSize: "12px",
+  cursor: "pointer",
+  outline: "none",
+};
+
+const gotoInput = {
+  width: "60px",
+  padding: "6px 8px",
+  borderRadius: "6px",
+  border: `1px solid ${GOLD}`,
+  background: BG_DARK,
+  color: TEXT_PRIMARY,
+  fontSize: "12px",
+  textAlign: "center",
+  outline: "none",
+};
+
+const gotoButton = {
+  padding: "6px 12px",
+  borderRadius: "6px",
+  border: `1px solid ${GOLD}`,
+  background: "transparent",
+  color: GOLD,
+  fontSize: "12px",
+  fontWeight: 600,
+  cursor: "pointer",
+};

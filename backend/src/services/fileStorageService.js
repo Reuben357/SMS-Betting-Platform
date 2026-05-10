@@ -5,11 +5,7 @@ const { promisify } = require('util');
 
 const gzip = promisify(zlib.gzip);
 
-// ------------------------------------
-// Compress and write a CSV buffer
-// to disk under storage/uploads/YYYY/MM/
-// Returns the relative file path
-// ------------------------------------
+// Compressing the file before writing to save disk space, especially for large CSVs.
 async function storeRawFile(buffer, originalFilename) {
   const now = new Date();
   const year = now.getFullYear();

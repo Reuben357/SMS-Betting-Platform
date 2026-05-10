@@ -3,6 +3,13 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
+// Midnight Gold theme (consistent with the rest of the app)
+const BG_DARK = "#1A1A1A";
+const CARD_BG = "#262626";
+const TEXT_PRIMARY = "#FFFFFF";
+const TEXT_SECONDARY = "#A3A3A3";
+const GOLD = "#B3945B";
+
 export default function SetupPage() {
   const router = useRouter();
   const [form, setForm] = useState({ name: "", email: "", password: "" });
@@ -11,7 +18,7 @@ export default function SetupPage() {
   const [error, setError] = useState(null);
   const [done, setDone] = useState(false);
 
-  // Redirect away if setup is not required
+  // Redirect away if setup is not required (i.e., admin already exists)
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/setup/status`)
       .then((r) => r.json())
@@ -41,7 +48,6 @@ export default function SetupPage() {
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Setup failed.");
-
       setDone(true);
     } catch (err) {
       setError(err.message);
@@ -59,23 +65,37 @@ export default function SetupPage() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "#f5f5f5",
+        background: BG_DARK,
       }}
     >
       <div
         style={{
-          background: "#fff",
+          background: CARD_BG,
           padding: "40px",
-          borderRadius: "8px",
-          border: "1px solid #eee",
+          borderRadius: "16px",
+          border: `1px solid ${GOLD}33`,
           width: "100%",
           maxWidth: "420px",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
         }}
       >
-        <h1 style={{ fontSize: "20px", fontWeight: 700, marginBottom: "8px" }}>
-          System Setup
+        <h1
+          style={{
+            fontSize: "20px",
+            fontWeight: 700,
+            marginBottom: "8px",
+            color: GOLD,
+          }}
+        >
+          JENGATIPS Setup
         </h1>
-        <p style={{ color: "#666", fontSize: "14px", marginBottom: "28px" }}>
+        <p
+          style={{
+            color: TEXT_SECONDARY,
+            fontSize: "14px",
+            marginBottom: "28px",
+          }}
+        >
           Create the administrator account. This page is only available once.
         </p>
 
@@ -83,7 +103,7 @@ export default function SetupPage() {
           <div style={{ textAlign: "center" }}>
             <p
               style={{
-                color: "#16a34a",
+                color: "#10B981",
                 fontWeight: 600,
                 marginBottom: "16px",
               }}
@@ -95,11 +115,12 @@ export default function SetupPage() {
               style={{
                 display: "inline-block",
                 padding: "10px 24px",
-                background: "#111",
-                color: "#fff",
-                borderRadius: "4px",
+                background: GOLD,
+                color: BG_DARK,
+                borderRadius: "8px",
                 textDecoration: "none",
                 fontSize: "14px",
+                fontWeight: "bold",
               }}
             >
               Proceed to Login
@@ -134,6 +155,7 @@ export default function SetupPage() {
                     fontSize: "13px",
                     fontWeight: 600,
                     marginBottom: "6px",
+                    color: TEXT_SECONDARY,
                   }}
                 >
                   {label}
@@ -148,9 +170,11 @@ export default function SetupPage() {
                   style={{
                     width: "100%",
                     padding: "9px 12px",
-                    border: "1px solid #ddd",
-                    borderRadius: "4px",
+                    border: `1px solid ${GOLD}33`,
+                    borderRadius: "8px",
                     fontSize: "14px",
+                    background: BG_DARK,
+                    color: TEXT_PRIMARY,
                     boxSizing: "border-box",
                   }}
                 />
@@ -161,10 +185,10 @@ export default function SetupPage() {
               <div
                 style={{
                   padding: "10px 12px",
-                  background: "#fef2f2",
-                  border: "1px solid #fecaca",
-                  borderRadius: "4px",
-                  color: "#dc2626",
+                  background: "#2A1C1C",
+                  border: "1px solid #EF4444",
+                  borderRadius: "8px",
+                  color: "#EF4444",
                   fontSize: "13px",
                   marginBottom: "16px",
                 }}
@@ -179,13 +203,13 @@ export default function SetupPage() {
               style={{
                 width: "100%",
                 padding: "10px",
-                background: loading ? "#ccc" : "#111",
-                color: "#fff",
+                background: loading ? TEXT_SECONDARY : GOLD,
+                color: BG_DARK,
                 border: "none",
-                borderRadius: "4px",
+                borderRadius: "8px",
                 fontSize: "14px",
+                fontWeight: "bold",
                 cursor: loading ? "not-allowed" : "pointer",
-                fontWeight: 600,
               }}
             >
               {loading ? "Creating account..." : "Create Admin Account"}

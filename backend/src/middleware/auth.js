@@ -1,6 +1,16 @@
+// Auth0 JWT validation + role-based access guards.
+// Usage:
+//   router.get("/summary", requireAdmin, getAccountingSummary);
+//   router.get("/tips",    requireAnyUser, getTips);
+
 const { auth, claimCheck } = require("express-oauth2-jwt-bearer");
 require("dotenv").config();
-const { ROLES_CLAIM } = require("../config/constants");
+
+// Use a consistent namespace for custom claims (must match Auth0 Action)
+const NAMESPACE = "https://betting-tips-api";
+const ROLES_CLAIM = `${NAMESPACE}/roles`;
+
+const { logger } = require("./errorHandler");
 
 // JWT validation middleware
 const validateToken = auth({
@@ -9,7 +19,7 @@ const validateToken = auth({
   tokenSigningAlg: "RS256",
 });
 
-// Role check factory
+// Factory to check if a required role exists in the token
 function requireRole(role) {
   return claimCheck((payload) => {
     const roles = payload[ROLES_CLAIM] ?? [];
@@ -17,9 +27,24 @@ function requireRole(role) {
   }, `Requires role: ${role}`);
 }
 
-// Composed role guards
+// Middleware to log sensitive access for auditing
+function logSensitiveAccess(routeName) {
+  return (req, res, next) => {
+    const user = req.auth?.payload?.sub ?? "unknown";
+    logger.info(`Sensitive access: ${routeName} by ${user}`);
+    next();
+  };
+}
+
+// Composed guards for routes
 const requireAdmin = [validateToken, requireRole("admin")];
 const requireStaff = [validateToken, requireRole("staff")];
 const requireAnyUser = [validateToken];
 
-module.exports = { validateToken, requireAdmin, requireStaff, requireAnyUser };
+module.exports = {
+  validateToken,
+  requireAdmin,
+  requireStaff,
+  requireAnyUser,
+  logSensitiveAccess,
+};

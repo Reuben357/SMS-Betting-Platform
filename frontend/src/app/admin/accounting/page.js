@@ -1,234 +1,971 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import TopBar from '@/components/TopBar';
+import { useState, useEffect, useCallback, useMemo } from "react";
+import TopBar from "@/components/TopBar";
+import { exportToPDF } from "@/lib/pdfExport";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
-const mockInflow = [
-  { phone: '0712345678', amount: 50, package: '10 Odds', ref: 'RGH9K2X1LM', time: '2:14 PM' },
-  { phone: '0734567890', amount: 30, package: '8 Odds', ref: 'RGH9K2X3LP', time: '2:22 PM' },
-  { phone: '0756789012', amount: 15, package: '4 Odds', ref: 'RGH9K2X5LR', time: '2:45 PM' },
-  { phone: '0789012345', amount: 50, package: '10 Odds', ref: 'RGH9K2X7LT', time: '3:10 PM' },
-  { phone: '0701234567', amount: 30, package: '8 Odds', ref: 'RGH9K2X8LU', time: '3:28 PM' },
-];
+// Midnight Gold color palette
+const BG_DARK = "#1A1A1A";
+const CARD_BG = "#262626";
+const TEXT_PRIMARY = "#FFFFFF";
+const TEXT_SECONDARY = "#A3A3A3";
+const GOLD = "#B3945B";
+const GOLD_LIGHT = "#D4AF6A";
+const DANGER = "#EF4444";
+const SUCCESS = "#10B981";
 
-const mockOutflow = [
-  { description: 'DigitalOcean VPS', category: 'VPS', amount: 2500, date: '1 Mar 2026' },
-  { description: 'OnfonMedia SMS Credits', category: 'SMS Gateway', amount: 1200, date: '5 Mar 2026' },
-  { description: 'Domain renewal', category: 'Domain', amount: 800, date: '10 Mar 2026' },
-];
-
-const mockFlagged = [
-  { phone: '0723456789', amount: 35, reason: 'Overpayment — KES 5 excess', ref: 'RGH9K2X2LN', resolved: false },
-  { phone: '0745678901', amount: 10, reason: 'Below minimum (KES 15)', ref: 'RGH9K2X4LQ', resolved: false },
-  { phone: '0767890123', amount: 75, reason: 'No matching package', ref: 'RGH9K2X6LS', resolved: true },
-];
+// Icons for StatCards (unchanged, but will use currentColor)
+const IconInflow = () => (
+  <svg
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
+    <path d="m7 7 10 10M17 7v10H7" />
+  </svg>
+);
+const IconOutflow = () => (
+  <svg
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
+    <path d="M17 17 7 7M7 17V7h10" />
+  </svg>
+);
+const IconNet = () => (
+  <svg
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
+    <line x1="12" y1="2" x2="12" y2="22" />
+    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+  </svg>
+);
+const IconFlag = () => (
+  <svg
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
+    <circle cx="12" cy="12" r="10" />
+    <line x1="12" y1="8" x2="12" y2="12" />
+    <line x1="12" y1="16" x2="12.01" y2="16" />
+  </svg>
+);
 
 export default function AccountingPage() {
-  const [tab, setTab] = useState('inflow');
-  const [outflowForm, setOutflowForm] = useState({ description: '', category: 'VPS', amount: '' });
+  const [tab, setTab] = useState("inflow"); // inflow, outflow, flagged
+  const [obfuscate, setObfuscate] = useState(false);
+  const [summary, setSummary] = useState({
+    inflow: 0,
+    outflow: 0,
+    net_profit: 0,
+    flagged: { unresolved_count: 0 },
+  });
+  const [rawListData, setRawListData] = useState([]);
+  const [filteredListData, setFilteredListData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [outflowForm, setOutflowForm] = useState({
+    description: "",
+    category: "VPS",
+    amount: "",
+  });
 
-  const totalInflow = mockInflow.reduce((s, r) => s + r.amount, 0);
-  const totalOutflow = mockOutflow.reduce((s, r) => s + r.amount, 0);
-  const net = totalInflow - totalOutflow;
-  const unresolved = mockFlagged.filter(f => !f.resolved).length;
+  // Pagination states
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(15); // items per page
+  const [totalItems, setTotalItems] = useState(0);
+  const [pages, setPages] = useState(1);
+  const [gotoPage, setGotoPage] = useState("");
 
-  const inputStyle = {
-    padding: '8px 10px', border: '1px solid #475569', borderRadius: '4px',
-    fontSize: '13px', background: '#0f172a', color: '#f1f5f9',
+  // Search/filter state
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [searchPhone, setSearchPhone] = useState("");
+
+  // Helper to generate page numbers (1 ... 1143 ...)
+  const getPageNumbers = () => {
+    const total = pages;
+    const current = page;
+    const delta = 2;
+    let range = [];
+    for (
+      let i = Math.max(2, current - delta);
+      i <= Math.min(total - 1, current + delta);
+      i++
+    ) {
+      range.push(i);
+    }
+    if (current - delta > 2) range.unshift("...");
+    if (current + delta < total - 1) range.push("...");
+    range.unshift(1);
+    if (total !== 1) range.push(total);
+    return [...new Set(range)];
+  };
+
+  // Fetch accounting summary and list data
+  const fetchAccountingData = useCallback(
+    async (newPage = page, newLimit = limit) => {
+      setLoading(true);
+      try {
+        // Summary (always fresh)
+        const sumRes = await fetch("/api/proxy/accounting/summary");
+        const sumData = await sumRes.json();
+        setSummary(sumData);
+
+        // List endpoint based on tab
+        let endpoint = `/api/proxy/accounting/purchases?page=${newPage}&limit=${newLimit}`;
+        if (tab === "outflow")
+          endpoint = `/api/proxy/outflows?page=${newPage}&limit=${newLimit}`;
+        if (tab === "flagged")
+          endpoint = `/api/proxy/accounting/flagged?page=${newPage}&limit=${newLimit}`;
+
+        const listRes = await fetch(endpoint);
+        const data = await listRes.json();
+
+        let items = [];
+        if (tab === "outflow") items = data.outflow || [];
+        else if (tab === "flagged") items = data.payments || [];
+        else items = data.purchases || [];
+
+        setRawListData(items);
+        setFilteredListData(items); // initial no filter
+        setTotalItems(data.total || 0);
+        setPages(data.pages || 1);
+      } catch (err) {
+        console.error("Fetch error:", err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [tab, page, limit],
+  );
+
+  // Re‑fetch when tab changes
+  useEffect(() => {
+    fetchAccountingData();
+  }, [fetchAccountingData, page, limit]);
+
+  // Apply filters whenever raw data or filter criteria change
+  useEffect(() => {
+    let filtered = [...rawListData];
+
+    if (tab !== "outflow") {
+      // Filter by phone number (if present in item)
+      if (searchPhone.trim()) {
+        const phone = searchPhone.trim().toLowerCase();
+        filtered = filtered.filter((item) =>
+          item.phone_number?.toLowerCase().includes(phone),
+        );
+      }
+    }
+
+    // Date range filter (use created_at)
+    if (dateFrom) {
+      const from = new Date(dateFrom);
+      filtered = filtered.filter((item) => new Date(item.created_at) >= from);
+    }
+    if (dateTo) {
+      const to = new Date(dateTo);
+      to.setHours(23, 59, 59, 999);
+      filtered = filtered.filter((item) => new Date(item.created_at) <= to);
+    }
+
+    setFilteredListData(filtered);
+  }, [rawListData, searchPhone, dateFrom, dateTo, tab]);
+
+  // Reset page when tab or limit changes
+  useEffect(() => {
+    setPage(1);
+  }, [tab, limit]);
+
+  // Add new outflow expense
+  const handleAddOutflow = async () => {
+    if (!outflowForm.amount || !outflowForm.description) {
+      alert("Please fill all fields");
+      return;
+    }
+    // Prevent negative amount
+    const amountNum = parseFloat(outflowForm.amount);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      alert("Amount must be a positive number");
+      return;
+    }
+    try {
+      const res = await fetch("/api/proxy/outflows", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...outflowForm, amount: amountNum }),
+      });
+      if (res.ok) {
+        setOutflowForm({ description: "", category: "VPS", amount: "" });
+        fetchAccountingData(); // refresh list and summary
+      } else {
+        alert("Failed to record expense");
+      }
+    } catch (err) {
+      alert("Error recording expense");
+    }
+  };
+
+  // Go to Page Handler
+  const handleGoToPage = () => {
+    const pageNum = parseInt(gotoPage);
+    if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= pages) {
+      setPage(pageNum);
+      setGotoPage("");
+    }
+  };
+
+  // Masking functions for obfuscation
+  const maskPhone = (val) => {
+    if (!val || !obfuscate) return val;
+    const str = String(val);
+    if (str.length < 4) return "*".repeat(str.length);
+    const first = str.slice(0, 2);
+    const last = str.slice(-2);
+    return `${first}******${last}`;
+  };
+
+  const maskRef = (val) =>
+    val && obfuscate ? `${val.slice(0, 3)}***${val.slice(-1)}` : val;
+
+  // Export to PDF using the filtered (visible) data
+  const handleExport = () => {
+    const columns =
+      tab === "outflow"
+        ? ["Description", "Category", "Amount", "By", "Date"]
+        : ["Phone", "Package", "Amount", "Reference", "Date"];
+
+    const rows = filteredListData.map((item) =>
+      tab === "outflow"
+        ? [
+            item.description,
+            item.category,
+            item.amount,
+            item.entered_by_email,
+            new Date(item.created_at).toLocaleDateString(),
+          ]
+        : [
+            maskPhone(item.phone_number),
+            item.package_name,
+            item.amount || item.amount_paid,
+            maskRef(item.mpesa_ref),
+            new Date(item.created_at).toLocaleString(),
+          ],
+    );
+
+    exportToPDF(
+      `${tab.toUpperCase()} Report`,
+      columns,
+      rows,
+      `${tab}_report`,
+      obfuscate,
+    );
   };
 
   return (
-    <>
-      <TopBar title="Accounting" />
-      <div style={{ padding: '24px 32px', maxWidth: '1000px' }}>
+    <div
+      style={{ background: BG_DARK, minHeight: "100vh", color: TEXT_PRIMARY }}
+    >
+      <TopBar title="Accounting & Finance" />
 
-        {/* Summary */}
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
-          gap: '16px', marginBottom: '24px',
-        }}>
-          {[
-            { label: 'Total Inflow', value: `KES ${totalInflow.toLocaleString()}`, color: '#34d399' },
-            { label: 'Total Outflow', value: `KES ${totalOutflow.toLocaleString()}`, color: '#f87171' },
-            { label: 'Net', value: `KES ${net.toLocaleString()}`, color: net >= 0 ? '#34d399' : '#f87171' },
-            { label: 'Flagged Payments', value: unresolved, color: '#f59e0b' },
-          ].map(({ label, value, color }) => (
-            <div key={label} style={{
-              background: '#1e293b', border: '1px solid #334155',
-              borderRadius: '8px', padding: '16px', textAlign: 'center',
-            }}>
-              <div style={{ fontSize: '20px', fontWeight: 700, color }}>{value}</div>
-              <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>{label}</div>
-            </div>
-          ))}
+      <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "32px" }}>
+        {/* Metric Cards */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
+            gap: "20px",
+            marginBottom: "32px",
+          }}
+        >
+          <StatCard
+            label="Inflow"
+            value={summary.inflow}
+            color={GOLD}
+            icon={<IconInflow />}
+          />
+          <StatCard
+            label="Outflow"
+            value={summary.outflow}
+            color={DANGER}
+            icon={<IconOutflow />}
+          />
+          <StatCard
+            label="Net Profit"
+            value={summary.net_profit}
+            color={SUCCESS}
+            icon={<IconNet />}
+          />
+          <StatCard
+            label="Flagged (unresolved)"
+            value={summary.flagged?.unresolved_count || 0}
+            color={DANGER}
+            icon={<IconFlag />}
+            isCount
+          />
         </div>
 
-        {/* Tabs */}
-        <div style={{ display: 'flex', gap: '4px', marginBottom: '20px', borderBottom: '1px solid #334155' }}>
-          {[
-            { id: 'inflow', label: 'Inflow' },
-            { id: 'outflow', label: 'Outflow' },
-            { id: 'flagged', label: `Flagged (${unresolved})` },
-          ].map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)} style={{
-              padding: '8px 16px', background: 'none', border: 'none',
-              cursor: 'pointer', fontSize: '13px',
-              color: tab === t.id ? '#3b82f6' : '#64748b',
-              fontWeight: tab === t.id ? 600 : 400,
-              borderBottom: tab === t.id ? '2px solid #3b82f6' : '2px solid transparent',
-            }}>
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Inflow */}
-        {tab === 'inflow' && (
-          <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}>
-            <div style={{
-              display: 'grid', gridTemplateColumns: '1.2fr 80px 1fr 1.5fr 80px',
-              gap: '8px', padding: '10px 16px', background: '#0f172a',
-              borderRadius: '8px 8px 0 0', borderBottom: '1px solid #334155',
-            }}>
-              {['Phone', 'Amount', 'Package', 'M-Pesa Ref', 'Time'].map(h => (
-                <div key={h} style={{ fontSize: '11px', color: '#475569', fontWeight: 700, textTransform: 'uppercase' }}>{h}</div>
-              ))}
-            </div>
-            {mockInflow.map((r, i) => (
-              <div key={i} style={{
-                display: 'grid', gridTemplateColumns: '1.2fr 80px 1fr 1.5fr 80px',
-                gap: '8px', padding: '11px 16px', fontSize: '13px',
-                borderBottom: '1px solid #1e293b', alignItems: 'center',
-              }}>
-                <div style={{ fontFamily: 'monospace', color: '#94a3b8' }}>{r.phone}</div>
-                <div style={{ color: '#34d399', fontWeight: 600 }}>{r.amount}</div>
-                <div style={{ color: '#f1f5f9' }}>{r.package}</div>
-                <div style={{ fontFamily: 'monospace', color: '#64748b', fontSize: '12px' }}>{r.ref}</div>
-                <div style={{ color: '#475569', fontSize: '12px' }}>{r.time}</div>
-              </div>
+        {/* Tab Navigation & Controls */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "24px",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              background: CARD_BG,
+              borderRadius: "12px",
+              padding: "4px",
+              border: `1px solid ${GOLD}33`,
+            }}
+          >
+            {["inflow", "outflow", "flagged"].map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                style={{
+                  padding: "8px 24px",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                  fontWeight: "bold",
+                  transition: "all 0.2s",
+                  background: tab === t ? GOLD : "transparent",
+                  color: tab === t ? BG_DARK : TEXT_SECONDARY,
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
+                {t.toUpperCase()}
+              </button>
             ))}
           </div>
-        )}
 
-        {/* Outflow */}
-        {tab === 'outflow' && (
-          <div>
-            <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '8px', padding: '20px', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#f1f5f9', marginBottom: '14px' }}>Add Expense</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '10px', alignItems: 'end' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Description</label>
-                  <input style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }}
-                    placeholder="e.g. OnfonMedia SMS Credits"
-                    value={outflowForm.description}
-                    onChange={e => setOutflowForm(f => ({ ...f, description: e.target.value }))} />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Category</label>
-                  <select style={{ ...inputStyle, width: '100%' }}
-                    value={outflowForm.category}
-                    onChange={e => setOutflowForm(f => ({ ...f, category: e.target.value }))}>
-                    <option>VPS</option>
-                    <option>SMS Gateway</option>
-                    <option>Domain</option>
-                    <option>Other</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Amount (KES)</label>
-                  <input type="number" style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }}
-                    placeholder="0"
-                    value={outflowForm.amount}
-                    onChange={e => setOutflowForm(f => ({ ...f, amount: e.target.value }))} />
-                </div>
-                <button style={{ padding: '8px 16px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>
-                  Add
+          <div style={{ display: "flex", gap: "16px", alignItems: "center" }}>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                cursor: "pointer",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "11px",
+                  fontWeight: "bold",
+                  color: TEXT_SECONDARY,
+                }}
+              >
+                Obfuscate
+              </span>
+              <div
+                onClick={() => setObfuscate(!obfuscate)}
+                style={{
+                  width: "40px",
+                  height: "20px",
+                  borderRadius: "10px",
+                  background: obfuscate ? GOLD : "#444",
+                  position: "relative",
+                  transition: "0.2s",
+                  cursor: "pointer",
+                }}
+              >
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "2px",
+                    left: obfuscate ? "22px" : "2px",
+                    width: "16px",
+                    height: "16px",
+                    background: "#FFF",
+                    borderRadius: "50%",
+                    transition: "0.2s",
+                  }}
+                />
+              </div>
+            </label>
+            <button
+              onClick={handleExport}
+              style={{
+                background: "transparent",
+                border: `1px solid ${GOLD}`,
+                color: GOLD,
+                padding: "6px 16px",
+                borderRadius: "8px",
+                fontSize: "12px",
+                fontWeight: "bold",
+                cursor: "pointer",
+              }}
+            >
+              Export PDF
+            </button>
+          </div>
+        </div>
+
+        {/* Filter Bar */}
+        <div
+          style={{
+            background: CARD_BG,
+            borderRadius: "12px",
+            padding: "16px",
+            marginBottom: "24px",
+            border: `1px solid ${GOLD}33`,
+          }}
+        >
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+              gap: "16px",
+            }}
+          >
+            {tab !== "outflow" && (
+              <input
+                type="text"
+                placeholder="Search by phone number..."
+                value={searchPhone}
+                onChange={(e) => setSearchPhone(e.target.value)}
+                style={{
+                  background: BG_DARK,
+                  border: `1px solid ${GOLD}33`,
+                  borderRadius: "8px",
+                  padding: "8px 12px",
+                  color: TEXT_PRIMARY,
+                  fontSize: "13px",
+                }}
+              />
+            )}
+            <input
+              type="date"
+              placeholder="From date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              style={{
+                background: BG_DARK,
+                border: `1px solid ${GOLD}33`,
+                borderRadius: "8px",
+                padding: "8px 12px",
+                color: TEXT_PRIMARY,
+                fontSize: "13px",
+              }}
+            />
+            <input
+              type="date"
+              placeholder="To date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              style={{
+                background: BG_DARK,
+                border: `1px solid ${GOLD}33`,
+                borderRadius: "8px",
+                padding: "8px 12px",
+                color: TEXT_PRIMARY,
+                fontSize: "13px",
+              }}
+            />
+            <button
+              onClick={() => {
+                setSearchPhone("");
+                setDateFrom("");
+                setDateTo("");
+              }}
+              style={{
+                background: `${GOLD}20`,
+                border: `1px solid ${GOLD}`,
+                borderRadius: "8px",
+                padding: "8px 12px",
+                color: GOLD,
+                fontSize: "12px",
+                fontWeight: "bold",
+                cursor: "pointer",
+              }}
+            >
+              Clear Filters
+            </button>
+          </div>
+        </div>
+
+        {/* Tab Content */}
+        <div
+          style={{
+            background: CARD_BG,
+            borderRadius: "16px",
+            border: `1px solid ${GOLD}33`,
+            overflow: "hidden",
+          }}
+        >
+          {/* Outflow form – only when tab is outflow */}
+          {tab === "outflow" && (
+            <div
+              style={{
+                padding: "20px",
+                borderBottom: `1px solid ${GOLD}33`,
+                background: `${GOLD}10`,
+              }}
+            >
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "2fr 1fr 1fr auto",
+                  gap: "12px",
+                  alignItems: "end",
+                }}
+              >
+                <Input
+                  label="Description"
+                  value={outflowForm.description}
+                  onChange={(v) =>
+                    setOutflowForm({ ...outflowForm, description: v })
+                  }
+                />
+                <Select
+                  label="Category"
+                  value={outflowForm.category}
+                  options={["Domain", "VPS", "SMS Gateway", "Other"]}
+                  onChange={(v) =>
+                    setOutflowForm({ ...outflowForm, category: v })
+                  }
+                />
+                <Input
+                  label="Amount (KES)"
+                  type="number"
+                  value={outflowForm.amount}
+                  onChange={(v) =>
+                    setOutflowForm({ ...outflowForm, amount: v })
+                  }
+                  min="0"
+                  step="1"
+                />
+                <button
+                  onClick={handleAddOutflow}
+                  style={{
+                    background: GOLD,
+                    color: BG_DARK,
+                    border: "none",
+                    padding: "10px 20px",
+                    borderRadius: "8px",
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                    height: "42px",
+                  }}
+                >
+                  Add Expense
                 </button>
               </div>
             </div>
+          )}
 
-            <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}>
-              <div style={{
-                display: 'grid', gridTemplateColumns: '2fr 1fr 100px 100px',
-                gap: '8px', padding: '10px 16px', background: '#0f172a',
-                borderRadius: '8px 8px 0 0', borderBottom: '1px solid #334155',
-              }}>
-                {['Description', 'Category', 'Amount', 'Date'].map(h => (
-                  <div key={h} style={{ fontSize: '11px', color: '#475569', fontWeight: 700, textTransform: 'uppercase' }}>{h}</div>
+          {/* Table */}
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead
+                style={{
+                  background: `${GOLD}10`,
+                  borderBottom: `1px solid ${GOLD}33`,
+                }}
+              >
+                <tr
+                  style={{
+                    fontSize: "10px",
+                    fontWeight: "bold",
+                    color: TEXT_SECONDARY,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  <th style={{ padding: "16px", textAlign: "left" }}>Entity</th>
+                  <th style={{ padding: "16px", textAlign: "left" }}>
+                    {tab === "outflow" ? "Category" : "Package"}
+                  </th>
+                  <th style={{ padding: "16px", textAlign: "left" }}>Amount</th>
+                  <th style={{ padding: "16px", textAlign: "left" }}>
+                    Reference
+                  </th>
+                  <th style={{ padding: "16px", textAlign: "right" }}>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredListData.map((item, idx) => (
+                  <tr key={idx} style={{ borderBottom: `1px solid ${GOLD}20` }}>
+                    <td style={{ padding: "16px", fontWeight: "bold" }}>
+                      {tab === "outflow"
+                        ? item.description
+                        : maskPhone(item.phone_number)}
+                    </td>
+                    <td style={{ padding: "16px" }}>
+                      <span
+                        style={{
+                          background: `${GOLD}20`,
+                          padding: "4px 8px",
+                          borderRadius: "20px",
+                          fontSize: "10px",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {item.package_name || item.category}
+                      </span>
+                    </td>
+                    <td
+                      style={{
+                        padding: "16px",
+                        fontWeight: "bold",
+                        color: GOLD,
+                      }}
+                    >
+                      KES {(item.amount || item.amount_paid).toLocaleString()}
+                    </td>
+                    <td
+                      style={{
+                        padding: "16px",
+                        fontSize: "12px",
+                        color: TEXT_SECONDARY,
+                      }}
+                    >
+                      {tab === "outflow"
+                        ? item.entered_by_email
+                        : maskRef(item.mpesa_ref)}
+                    </td>
+                    <td
+                      style={{
+                        padding: "16px",
+                        textAlign: "right",
+                        fontSize: "12px",
+                        color: TEXT_SECONDARY,
+                      }}
+                    >
+                      {new Date(item.created_at).toLocaleDateString()}
+                    </td>
+                  </tr>
                 ))}
-              </div>
-              {mockOutflow.map((r, i) => (
-                <div key={i} style={{
-                  display: 'grid', gridTemplateColumns: '2fr 1fr 100px 100px',
-                  gap: '8px', padding: '11px 16px', fontSize: '13px',
-                  borderBottom: '1px solid #1e293b', alignItems: 'center',
-                }}>
-                  <div style={{ color: '#f1f5f9' }}>{r.description}</div>
-                  <div>
-                    <span style={{ padding: '2px 8px', background: '#1e293b', border: '1px solid #475569', borderRadius: '4px', fontSize: '11px', color: '#94a3b8' }}>
-                      {r.category}
-                    </span>
-                  </div>
-                  <div style={{ color: '#f87171', fontWeight: 600 }}>{r.amount.toLocaleString()}</div>
-                  <div style={{ color: '#475569', fontSize: '12px' }}>{r.date}</div>
-                </div>
-              ))}
-            </div>
+                {filteredListData.length === 0 && !loading && (
+                  <tr>
+                    <td
+                      colSpan="5"
+                      style={{
+                        textAlign: "center",
+                        padding: "48px",
+                        color: TEXT_SECONDARY,
+                      }}
+                    >
+                      No records match the filters.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
-        )}
 
-        {/* Flagged */}
-        {tab === 'flagged' && (
-          <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}>
-            <div style={{
-              display: 'grid', gridTemplateColumns: '1.2fr 80px 2fr 1.5fr 100px 80px',
-              gap: '8px', padding: '10px 16px', background: '#0f172a',
-              borderRadius: '8px 8px 0 0', borderBottom: '1px solid #334155',
-            }}>
-              {['Phone', 'Amount', 'Reason', 'Ref', 'Status', ''].map(h => (
-                <div key={h} style={{ fontSize: '11px', color: '#475569', fontWeight: 700, textTransform: 'uppercase' }}>{h}</div>
-              ))}
-            </div>
-            {mockFlagged.map((r, i) => (
-              <div key={i} style={{
-                display: 'grid', gridTemplateColumns: '1.2fr 80px 2fr 1.5fr 100px 80px',
-                gap: '8px', padding: '11px 16px', fontSize: '13px',
-                borderBottom: '1px solid #1e293b', alignItems: 'center',
-              }}>
-                <div style={{ fontFamily: 'monospace', color: '#94a3b8' }}>{r.phone}</div>
-                <div style={{ color: '#f59e0b', fontWeight: 600 }}>{r.amount}</div>
-                <div style={{ color: '#64748b', fontSize: '12px' }}>{r.reason}</div>
-                <div style={{ fontFamily: 'monospace', color: '#475569', fontSize: '12px' }}>{r.ref}</div>
-                <div>
-                  <span style={{
-                    padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
-                    background: r.resolved ? '#052e1622' : '#450a0a22',
-                    color: r.resolved ? '#34d399' : '#f87171',
-                    border: `1px solid ${r.resolved ? '#166534' : '#991b1b'}`,
-                  }}>
-                    {r.resolved ? 'Resolved' : 'Pending'}
+          {/* Pagination Footer */}
+          <div style={paginationContainer}>
+            <div style={paginationControls}>
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                style={paginationButton}
+              >
+                <ChevronLeft size={16} /> Prev
+              </button>
+              {getPageNumbers().map((item, idx) =>
+                item === "..." ? (
+                  <span key={`ellipsis-${idx}`} style={paginationEllipsis}>
+                    …
                   </span>
-                </div>
-                <div>
-                  {!r.resolved && (
-                    <button style={{
-                      padding: '3px 10px', background: 'none',
-                      border: '1px solid #475569', borderRadius: '4px',
-                      color: '#94a3b8', cursor: 'pointer', fontSize: '11px',
-                    }}>
-                      Resolve
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+                ) : (
+                  <button
+                    key={item}
+                    onClick={() => setPage(item)}
+                    style={{
+                      ...paginationButton,
+                      background: page === item ? GOLD : "transparent",
+                      color: page === item ? BG_DARK : GOLD,
+                      borderColor: GOLD,
+                    }}
+                  >
+                    {item}
+                  </button>
+                ),
+              )}
+              <button
+                onClick={() => setPage((p) => Math.min(pages, p + 1))}
+                disabled={page === pages}
+                style={paginationButton}
+              >
+                Next <ChevronRight size={16} />
+              </button>
+            </div>
 
-        <p style={{ fontSize: '12px', color: '#334155', marginTop: '16px', textAlign: 'center' }}>
-          Live M-Pesa data integrated in Phase 2. Showing sample data for demonstration.
-        </p>
+            <div style={paginationSide}>
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "6px" }}
+              >
+                <select
+                  value={limit}
+                  onChange={(e) => setLimit(Number(e.target.value))}
+                  style={limitSelect}
+                >
+                  {[10, 15, 20, 50, 100].map((num) => (
+                    <option key={num} value={num}>
+                      {num} / page
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "8px" }}
+              >
+                <span style={{ fontSize: "12px", color: TEXT_SECONDARY }}>
+                  Go to
+                </span>
+                <input
+                  type="number"
+                  min="1"
+                  max={pages}
+                  value={gotoPage}
+                  onChange={(e) => setGotoPage(e.target.value)}
+                  onKeyPress={(e) => e.key === "Enter" && handleGoToPage()}
+                  style={gotoInput}
+                />
+                <button onClick={handleGoToPage} style={gotoButton}>
+                  Page
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {loading && (
+            <div
+              style={{
+                padding: "32px",
+                textAlign: "center",
+                color: GOLD,
+                fontWeight: "bold",
+              }}
+            >
+              Syncing Records...
+            </div>
+          )}
+        </div>
       </div>
-    </>
+    </div>
   );
 }
+
+// Reusable StatCard component
+function StatCard({ label, value, color, icon, isCount }) {
+  return (
+    <div
+      style={{
+        background: CARD_BG,
+        padding: "20px",
+        borderRadius: "16px",
+        border: `1px solid ${GOLD}33`,
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+      }}
+    >
+      <div>
+        <div
+          style={{
+            fontSize: "10px",
+            fontWeight: "bold",
+            color: TEXT_SECONDARY,
+            marginBottom: "4px",
+          }}
+        >
+          {label}
+        </div>
+        <div style={{ fontSize: "28px", fontWeight: "bold", color }}>
+          {isCount ? value : `KES ${Number(value || 0).toLocaleString()}`}
+        </div>
+      </div>
+      <div
+        style={{
+          color,
+          background: `${GOLD}10`,
+          padding: "8px",
+          borderRadius: "10px",
+        }}
+      >
+        {icon}
+      </div>
+    </div>
+  );
+}
+
+// Input component with validation for positive numbers
+function Input({
+  label,
+  type = "text",
+  value,
+  onChange,
+  min = "0",
+  step = "1",
+  ...props
+}) {
+  const handleChange = (e) => {
+    let val = e.target.value;
+    if (type === "number") {
+      if (val === "") val = "";
+      else if (parseFloat(val) < 0) val = "0";
+    }
+    onChange(val);
+  };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+      <label
+        style={{ fontSize: "10px", fontWeight: "bold", color: TEXT_SECONDARY }}
+      >
+        {label}
+      </label>
+      <input
+        type={type}
+        value={value}
+        onChange={handleChange}
+        min={min}
+        step={step}
+        style={{
+          background: BG_DARK,
+          border: `1px solid ${GOLD}33`,
+          borderRadius: "8px",
+          padding: "10px 12px",
+          color: TEXT_PRIMARY,
+          fontSize: "13px",
+          outline: "none",
+        }}
+        {...props}
+      />
+    </div>
+  );
+}
+
+function Select({ label, options, value, onChange }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+      <label
+        style={{ fontSize: "10px", fontWeight: "bold", color: TEXT_SECONDARY }}
+      >
+        {label}
+      </label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        style={{
+          background: BG_DARK,
+          border: `1px solid ${GOLD}33`,
+          borderRadius: "8px",
+          padding: "10px 12px",
+          color: TEXT_PRIMARY,
+          fontSize: "13px",
+        }}
+      >
+        {options.map((opt) => (
+          <option key={opt} value={opt}>
+            {opt}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+// New pagination styles (place inside component or as global const)
+const paginationContainer = {
+  padding: "16px 24px",
+  borderTop: `1px solid ${GOLD}33`,
+  background: BG_DARK,
+  display: "flex",
+  flexWrap: "wrap",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "16px",
+};
+
+const paginationControls = {
+  display: "flex",
+  gap: "8px",
+  alignItems: "center",
+  flexWrap: "wrap",
+};
+
+const paginationButton = {
+  padding: "6px 12px",
+  border: `1px solid ${GOLD}`,
+  borderRadius: "6px",
+  background: "transparent",
+  color: GOLD,
+  fontSize: "13px",
+  fontWeight: 600,
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "4px",
+  transition: "all 0.2s",
+};
+
+const paginationEllipsis = {
+  padding: "6px 8px",
+  color: TEXT_SECONDARY,
+  fontSize: "14px",
+};
+
+const paginationSide = {
+  display: "flex",
+  gap: "16px",
+  alignItems: "center",
+  flexWrap: "wrap",
+};
+
+const limitSelect = {
+  padding: "6px 10px",
+  borderRadius: "6px",
+  border: `1px solid ${GOLD}`,
+  background: BG_DARK,
+  color: TEXT_PRIMARY,
+  fontSize: "12px",
+  cursor: "pointer",
+  outline: "none",
+};
+
+const gotoInput = {
+  width: "60px",
+  padding: "6px 8px",
+  borderRadius: "6px",
+  border: `1px solid ${GOLD}`,
+  background: BG_DARK,
+  color: TEXT_PRIMARY,
+  fontSize: "12px",
+  textAlign: "center",
+  outline: "none",
+};
+
+const gotoButton = {
+  padding: "6px 12px",
+  borderRadius: "6px",
+  border: `1px solid ${GOLD}`,
+  background: "transparent",
+  color: GOLD,
+  fontSize: "12px",
+  fontWeight: 600,
+  cursor: "pointer",
+};

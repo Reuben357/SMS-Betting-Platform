@@ -4,8 +4,14 @@ CREATE TYPE payment_status AS ENUM (
   'matched',
   'flagged_overpayment',
   'flagged_underpayment',
-  'flagged_no_match'
+  'flagged_no_match',
+  'flagged_incomplete_package',
+  'pending_package_completion',
+  'pending_retry',
+  'processing',
+  'failed'
 );
+
 
 CREATE TYPE tip_status AS ENUM (
   'pending',
@@ -28,7 +34,7 @@ CREATE TYPE message_status AS ENUM (
 
 -- Users
 
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   auth0_id VARCHAR(255) UNIQUE NOT NULL,
   name VARCHAR(255) NOT NULL,
@@ -39,11 +45,10 @@ CREATE TABLE users (
 
 -- Packages 
 
-CREATE TABLE packages (
+CREATE TABLE IF NOT EXISTS packages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(255) NOT NULL,
   price INTEGER NOT NULL,
-  tip_count INTEGER NOT NULL,
   game_count INTEGER NOT NULL,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -51,14 +56,14 @@ CREATE TABLE packages (
 );
 
 -- Seed the three confirmed packages
-INSERT INTO packages (name, price, tip_count, game_count) VALUES
-  ('4 Odds', 15, 4, 5),
-  ('8 Odds', 30, 8, 10),
-  ('10 Odds', 50, 10, 15);
+INSERT INTO packages (name, price, game_count) VALUES
+  ('4 Odds', 15, 5),
+  ('8 Odds', 30, 10),
+  ('10 Odds', 50, 15);
 
 -- Potential Customer Tiers
 
-CREATE TABLE tiers_potential (
+CREATE TABLE IF NOT EXISTS tiers_potential (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tier_number INTEGER UNIQUE NOT NULL,
   min_frequency INTEGER NOT NULL,
@@ -77,7 +82,7 @@ INSERT INTO tiers_potential (tier_number, min_frequency, max_frequency) VALUES
 
 -- Active Customer Tiers
 
-CREATE TABLE tiers_active (
+CREATE TABLE IF NOT EXISTS tiers_active (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tier_letter CHAR(1) NOT NULL,
   min_purchases INTEGER NOT NULL,
@@ -95,7 +100,7 @@ INSERT INTO tiers_active (tier_letter, min_purchases, max_purchases) VALUES
   ('C', 101, 150),
   ('D', 151, 200);
 
-CREATE TABLE tiers_active_sub (
+CREATE TABLE IF NOT EXISTS tiers_active_sub (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   sub_number INTEGER UNIQUE NOT NULL,
   min_spend INTEGER NOT NULL,
@@ -111,7 +116,7 @@ INSERT INTO tiers_active_sub (sub_number, min_spend, max_spend) VALUES
 
 -- CSV Uploads
 
-CREATE TABLE csv_uploads (
+CREATE TABLE IF NOT EXISTS csv_uploads (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   filename VARCHAR(255) NOT NULL,
   uploaded_by UUID NOT NULL REFERENCES users(id),
@@ -125,7 +130,7 @@ CREATE TABLE csv_uploads (
 
 -- Contacts (Potential customers)
 
-CREATE TABLE contacts (
+CREATE TABLE IF NOT EXISTS contacts (
   phone_number VARCHAR(20) PRIMARY KEY,
   name VARCHAR(255),
   frequency_count INTEGER NOT NULL DEFAULT 1,
@@ -139,7 +144,7 @@ CREATE INDEX idx_contacts_potential_tier ON contacts(potential_tier);
 
 -- Customers (Have made at least one purchase)
 
-CREATE TABLE customers (
+CREATE TABLE IF NOT EXISTS customers (
   phone_number VARCHAR(20) PRIMARY KEY REFERENCES contacts(phone_number),
   total_purchases INTEGER NOT NULL DEFAULT 0,
   tier_letter CHAR(1),
@@ -153,7 +158,7 @@ CREATE INDEX idx_customers_tier ON customers(tier_letter, tier_sub_number);
 
 -- Payments (Raw M-Pesa callbacks)
 
-CREATE TABLE payments (
+CREATE TABLE IF NOT EXISTS payments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   phone_number VARCHAR(20) NOT NULL,
   amount INTEGER NOT NULL,
@@ -175,7 +180,7 @@ CREATE INDEX idx_payments_resolved ON payments(resolved);
 
 -- Purchases (Confirmed fulfulled trancsactions)
 
-CREATE TABLE purchases (
+CREATE TABLE IF NOT EXISTS purchases (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   phone_number VARCHAR(20) NOT NULL REFERENCES contacts(phone_number),
   package_id UUID NOT NULL REFERENCES packages(id),
@@ -189,7 +194,7 @@ CREATE INDEX idx_purchases_package ON purchases(package_id);
 
 -- Tips
 
-CREATE TABLE tips (
+CREATE TABLE IF NOT EXISTS tips (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   game_name VARCHAR(255) NOT NULL,
   prediction VARCHAR(255) NOT NULL,
@@ -202,7 +207,7 @@ CREATE TABLE tips (
 -- Tips Delivery Session
 -- Links a set of tips to a specific send event
 
-CREATE TABLE tips_sessions (
+CREATE TABLE IF NOT EXISTS tips_sessions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   label VARCHAR(255),
   delivery_message TEXT,
@@ -213,15 +218,16 @@ CREATE TABLE tips_sessions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE tips_session_items (
+CREATE TABLE IF NOT EXISTS tips_session_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  session_id UUID NOT NULL REFERENCES tips_sessions(id),
-  tip_id UUID NOT NULL REFERENCES tips(id)
+  session_id UUID NOT NULL REFERENCES tips_sessions(id) ON DELETE CASCADE,
+  tip_id UUID NOT NULL REFERENCES tips(id) ON DELETE CASCADE,
+  UNIQUE(session_id, tip_id)
 );
 
 -- Outbound Messages Log
 
-CREATE TABLE messages (
+CREATE TABLE IF NOT EXISTS messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   recipient_phone VARCHAR(20) NOT NULL,
   message_type message_type NOT NULL,
@@ -237,7 +243,7 @@ CREATE INDEX idx_messages_status ON messages(status);
 
 -- Outflow (Manually entered expenses)
 
-CREATE TABLE outflow (
+CREATE TABLE IF NOT EXISTS outflow (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   amount INTEGER NOT NULL,
   description VARCHAR(255) NOT NULL,
@@ -247,3 +253,14 @@ CREATE TABLE outflow (
   entered_by UUID NOT NULL REFERENCES users(id),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS system_settings (
+  key VARCHAR(100) PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+INSERT INTO system_settings (key, value) VALUES
+  ('payment_confirmation_template', 'Thank you for your payment of KES {amount}. Your tips will arrive shortly.'),
+  ('tips_delivery_template', 'Your tips:\n{tips}')
+ON CONFLICT (key) DO NOTHING;

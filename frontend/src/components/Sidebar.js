@@ -1,18 +1,37 @@
-'use client';
+"use client";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useUser } from "@auth0/nextjs-auth0/client";
+import { isAdmin } from "@/lib/auth";
+import {
+  LayoutDashboard,
+  Users,
+  Zap,
+  Package,
+  CreditCard,
+  PieChart,
+  MessageSquare,
+  Settings,
+  LogOut,
+  UsersRound,
+} from "lucide-react";
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useUser } from '@auth0/nextjs-auth0/client';
-import { isAdmin } from '@/lib/auth';
+// Midnight Gold color palette
+const BG_DARK = "#1A1A1A";
+const GOLD = "#B3945B";
+const GOLD_DARK = "#8B6B3D";
+const TEXT_LIGHT = "#FFFFFF";
 
 const navItems = [
-  { label: 'Dashboard',  href: '/admin',            adminOnly: false },
-  { label: 'Leads',      href: '/admin/leads',      adminOnly: false },
-  { label: 'Tips',       href: '/admin/tips',       adminOnly: false },
-  { label: 'Payments',   href: '/admin/payments',   adminOnly: false },
-  { label: 'Accounting', href: '/admin/accounting', adminOnly: true  },
-  { label: 'Packages',   href: '/admin/packages',   adminOnly: true  },
-  { label: 'Settings',   href: '/admin/settings',   adminOnly: true  },
+  { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard, adminOnly: false },
+  { label: "Potential Customers", href: "/admin/leads", icon: Users, adminOnly: false },
+  { label: "Tips", href: "/admin/tips", icon: Zap, adminOnly: false },
+  { label: "Active Customers", href: "/admin/active-customers", icon: UsersRound, adminOnly: false },
+  { label: "Packages", href: "/admin/packages", icon: Package, adminOnly: false },
+  { label: "Payments", href: "/admin/payments", icon: CreditCard, adminOnly: false },
+  { label: "Accounting", href: "/admin/accounting", icon: PieChart, adminOnly: true },
+  { label: "SMS", href: "/admin/sms", icon: MessageSquare, adminOnly: false },
+  { label: "Tier Thresholds", href: "/admin/tiers", icon: Settings, adminOnly: false },
 ];
 
 export default function Sidebar() {
@@ -21,57 +40,89 @@ export default function Sidebar() {
   const admin = isAdmin(user);
 
   return (
-    <aside style={{
-      width: '220px',
-      minHeight: '100vh',
-      background: '#111',
-      color: '#fff',
-      display: 'flex',
-      flexDirection: 'column',
-      padding: '24px 0',
-    }}>
-      <div style={{ padding: '0 20px 32px' }}>
-        <p style={{ fontSize: '11px', color: '#888', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '1px' }}>
-          {admin ? 'Admin' : 'Staff'}
-        </p>
-        <p style={{ fontSize: '14px', fontWeight: 600 }}>
-          {user?.name ?? ''}
+    <aside
+      style={{
+        width: "260px",
+        minHeight: "100vh",
+        background: BG_DARK,
+        color: TEXT_LIGHT,
+        display: "flex",
+        flexDirection: "column",
+        borderRight: `1px solid ${GOLD}33`,
+      }}
+    >
+      <div style={{ padding: "32px 24px" }}>
+        <h1
+          style={{
+            fontSize: "20px",
+            fontWeight: 800,
+            color: GOLD,
+            margin: 0,
+            letterSpacing: "-0.5px",
+          }}
+        >
+          JENGATIPS
+        </h1>
+        <p
+          style={{
+            fontSize: "11px",
+            color: GOLD_DARK,
+            marginTop: "4px",
+            textTransform: "uppercase",
+            letterSpacing: "0.5px",
+          }}
+        >
+          {admin ? "System Admin" : "Staff Member"}
         </p>
       </div>
 
-      <nav style={{ flex: 1 }}>
+      <nav style={{ flex: 1, padding: "0 12px" }}>
         {navItems
-          .filter(item => !item.adminOnly || admin)
-          .map(item => {
+          .filter((item) => !item.adminOnly || admin)
+          .map((item) => {
             const active = pathname === item.href;
+            const Icon = item.icon;
             return (
-              <Link key={item.href} href={item.href} style={{
-                display: 'block',
-                padding: '10px 20px',
-                color: active ? '#fff' : '#aaa',
-                background: active ? '#222' : 'transparent',
-                textDecoration: 'none',
-                fontSize: '14px',
-                borderLeft: active ? '3px solid #fff' : '3px solid transparent',
-              }}>
+              <Link
+                key={item.href}
+                href={item.href}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  padding: "10px 16px",
+                  color: active ? GOLD : TEXT_LIGHT,
+                  background: active ? `${GOLD}10` : "transparent",
+                  textDecoration: "none",
+                  fontSize: "14px",
+                  borderRadius: "8px",
+                  marginBottom: "4px",
+                  transition: "0.2s",
+                }}
+              >
+                <Icon size={18} style={{ marginRight: "12px" }} />
                 {item.label}
               </Link>
             );
           })}
       </nav>
 
-      <div style={{ padding: '20px' }}>
-        <Link href="/api/auth/logout" style={{
-          display: 'block',
-          textAlign: 'center',
-          padding: '8px',
-          background: '#222',
-          color: '#aaa',
-          borderRadius: '4px',
-          textDecoration: 'none',
-          fontSize: '13px',
-        }}>
-          Sign out
+      <div style={{ padding: "20px" }}>
+        <Link
+          href="/api/auth/logout"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "12px",
+            background: `${GOLD}20`,
+            color: GOLD,
+            borderRadius: "8px",
+            textDecoration: "none",
+            fontSize: "13px",
+            border: `1px solid ${GOLD}40`,
+          }}
+        >
+          <LogOut size={16} style={{ marginRight: "8px" }} /> Sign out
         </Link>
       </div>
     </aside>

@@ -1,30 +1,27 @@
-const { pool } = require('../config/db');
+const { pool } = require("../config/db");
+const { logger } = require("./errorHandler");
 
-// The namespace must match exactly what is set in the Auth0 Action. All custom claims injected by the Action use this prefix.
-const NAMESPACE = 'https://betting-tips-api';
+const NAMESPACE = "https://betting-tips-api";
 const ROLES_CLAIM = `${NAMESPACE}/roles`;
 
-// User sync middleware
+// Sync user from Auth0 token to local database
 async function syncUser(req, res, next) {
   try {
-    const payload = req.auth.payload;
+    // Ensure validateToken middleware ran before
+    if (!req.auth || !req.auth.payload) {
+      return res.status(401).json({ error: "Authentication required." });
+    }
 
-    // sub is the Auth0 user ID — stable and unique across all login methods (Google, email, etc.)
+    const payload = req.auth.payload;
+    
     const auth0Id = payload.sub;
 
-    // Role from the custom namespace claim injected by the Auth0 Action.
-    // Defaults to 'staff' if no roles are present — safe lower privilege.
+    // Extract roles (default to ['staff'] if missing)
     const roles = payload[ROLES_CLAIM] ?? [];
-    const role = roles.includes('admin') ? 'admin' : 'staff';
+    const role = roles.includes("admin") ? "admin" : "staff";
 
-    // Email and name are injected by the Auth0 Action into the access token
-    // under the custom namespace. Fall back to standard claims for
-    // compatibility with tokens issued before the Action was updated.
-    const email =
-      payload[`${NAMESPACE}/email`] ??
-      payload.email ??
-      null;
-
+    // Get email and name – first from custom claims, then fallback to standard claims
+    const email = payload[`${NAMESPACE}/email`] ?? payload.email ?? null;
     const name =
       payload[`${NAMESPACE}/name`] ??
       payload.name ??
@@ -32,10 +29,7 @@ async function syncUser(req, res, next) {
       payload.nickname ??
       null;
 
-    // Used INSERT ... ON CONFLICT to upsert by auth0_id.
-    // Email is only written on first insert — never updated after that
-    // to avoid unique constraint conflicts if the same email appears
-    // on another record from a previous session.
+    // Upsert user – email is only set on first insert to avoid conflicts
     const result = await pool.query(
       `INSERT INTO users (auth0_id, name, email, role)
        VALUES ($1, $2, $3, $4)
@@ -47,14 +41,14 @@ async function syncUser(req, res, next) {
                ELSE users.name
              END
        RETURNING *`,
-      [auth0Id, name, email, role]
+      [auth0Id, name, email, role],
     );
 
     req.user = result.rows[0];
     next();
   } catch (err) {
-    console.error('User sync error:', err.message);
-    res.status(500).json({ error: 'Authentication error.' });
+    logger.error(`User sync error: ${err.message}`);
+    res.status(500).json({ error: "Authentication error." });
   }
 }
 

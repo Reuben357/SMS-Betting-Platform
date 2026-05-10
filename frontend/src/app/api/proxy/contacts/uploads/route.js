@@ -11,18 +11,22 @@ export async function GET(req) {
     const backendRes = await fetch(`${API_URL}/api/contacts/uploads`, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        'Cache-Control': 'no-store',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
       cache: 'no-store',
     });
 
+    if (!backendRes.ok) {
+       const errorData = await backendRes.text();
+       console.error(`Backend Error (${backendRes.status}):`, errorData);
+       return NextResponse.json({ error: "Backend rejected request", uploads: [] }, { status: backendRes.status });
+    }
+
     const data = await backendRes.json();
-    return NextResponse.json(data, { status: backendRes.status });
+    return NextResponse.json(data);
   } catch (err) {
-    console.error("Upload history proxy error:", err.message);
-    return NextResponse.json(
-      { error: "Failed to fetch upload history." },
-      { status: 500 },
-    );
+    console.error("Proxy Connection Error:", err.message);
+    return NextResponse.json({ error: "Cannot connect to backend server.", uploads: [] }, { status: 500 });
   }
 }

@@ -1,40 +1,40 @@
-const { z } = require('zod');
+const { z } = require("zod");
 
-// Validation middleware factory
+
 function validate(schema) {
   return (req, res, next) => {
     const result = schema.safeParse(req.body);
 
     if (!result.success) {
-      // Format Zod errors into a clean array of field messages
-      const errors = result.error.errors.map(e => ({
-        field: e.path.join('.'),
+      const errors = result.error.errors.map((e) => ({
+        field: e.path.join("."),
         message: e.message,
       }));
-
-      return res.status(400).json({
-        error: 'Validation failed.',
-        details: errors,
-      });
+      return res
+        .status(400)
+        .json({ error: "Validation failed.", details: errors });
     }
 
-    // Replace req.body with the parsed, type-safe data
     req.body = result.data;
     next();
   };
 }
 
-// Schemas
-// POST /api/setup/admin
+// Common schemas
 const setupSchema = z.object({
-  name: z.string()
-    .min(2, 'Name must be at least 2 characters.')
-    .max(100, 'Name must be under 100 characters.'),
-  email: z.string()
-    .email('A valid email address is required.'),
-  password: z.string()
-    .min(8, 'Password must be at least 8 characters.')
-    .max(128, 'Password must be under 128 characters.'),
+  name: z.string().min(2).max(100),
+  email: z.string().email(),
+  password: z.string().min(8).max(128),
 });
 
-module.exports = { validate, setupSchema };
+const packageSchema = z.object({
+  name: z.string().min(1),
+  price: z.number().positive(),
+  game_count: z.number().int().positive(),
+});
+
+const paymentResolveSchema = z.object({
+  // No body usually, but can add notes if needed
+});
+
+module.exports = { validate, setupSchema, packageSchema, paymentResolveSchema };

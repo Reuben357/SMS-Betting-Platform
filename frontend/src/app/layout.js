@@ -2,7 +2,7 @@ import { UserProvider } from '@auth0/nextjs-auth0/client';
 import './globals.css';
 
 export const metadata = {
-  title: 'Betting Tips Admin',
+  title: 'JENGATIPS',
   description: 'SMS-First Betting Tips Platform',
 };
 
