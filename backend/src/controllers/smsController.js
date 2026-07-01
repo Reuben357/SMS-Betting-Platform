@@ -9,7 +9,14 @@ const { logger } = require('../middleware/errorHandler');
  * Admin only.
  */
 async function sendBulkSMS(req, res) {
-  const { tier, phone, message, active_tier_letter, active_sub_number } = req.body;
+  const { tier, phone, message, active_tier_letter, active_sub_number, jackpot, jackpot_tier } = req.body;
+
+  let audienceType = null;
+  if(phone) audienceType = 'phone';
+  else if(tier) audienceType = `potential_tier_${tier}`;
+  else if(active_tier_letter && active_sub_number) audienceType = `active_sub_${active_tier_letter}${active_sub_number}`;
+  else if (jackpot) audienceType = `jackpot`;
+  else if (jackpot_tier) audienceType = `jackpot_tier_${jackpot_tier}`;
 
   if (!message) return res.status(400).json({ error: 'Message is required.' });
 
@@ -33,6 +40,24 @@ async function sendBulkSMS(req, res) {
         [active_tier_letter, active_sub_number]
       );
       phones = result.rows.map(row => row.phone_number);
+    } else if (jackpot_tier) {
+      // NEW: Filter jackpot customers by JP tier
+      const result = await pool.query(
+          `SELECT c.phone_number
+           FROM contacts c
+                  JOIN tiers_jp_potential jt
+                       ON c.jackpot_frequency >= jt.min_jp_frequency
+                         AND c.jackpot_frequency <= jt.max_jp_frequency
+           WHERE c.is_jackpot = true
+             AND jt.tier_number = $1`,
+          [jackpot_tier]
+      );
+      phones = result.rows.map(row => row.phone_number);
+    } else if (jackpot) {
+      const result = await pool.query(
+          `SELECT phone_number FROM contacts WHERE is_jackpot = true`
+      );
+      phones = result.rows.map(row => row.phone_number);
     }
 
     if (phones.length === 0) {
@@ -41,7 +66,7 @@ async function sendBulkSMS(req, res) {
 
     // Process sending
     const sendPromises = phones.map(p => 
-      sendSMS(p, message, 'advertising', null, req.user.id)
+      sendSMS(p, message, 'advertising', null, req.user.id, audienceType)
     );
     
     // We use Promise.allSettled so one failure doesn't stop the whole batch

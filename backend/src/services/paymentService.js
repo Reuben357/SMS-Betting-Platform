@@ -5,7 +5,7 @@ const { logger } = require("../middleware/errorHandler");
 
 /**
  * Helper: retrieve a system setting value by key.
- * Used for SMS templates.
+ * Used for SMS templates and subscription settings.
  */
 async function getTemplate(key) {
   const res = await pool.query(
@@ -13,6 +13,28 @@ async function getTemplate(key) {
     [key],
   );
   return res.rows[0]?.value || null;
+}
+
+/**
+ * Get current subscription price from system_settings.
+ * @returns {Promise<number>}
+ */
+async function getSubscriptionPrice() {
+  const res = await pool.query(
+    `SELECT value FROM system_settings WHERE key = 'subscription_price'`
+  );
+  return parseInt(res.rows[0]?.value) || 15; // fallback to 15
+}
+
+/**
+ * Get current subscription tips template from system_settings.
+ * @returns {Promise<string>}
+ */
+async function getSubscriptionTipsTemplate() {
+  const res = await pool.query(
+    `SELECT value FROM system_settings WHERE key = 'subscription_tips_template'`
+  );
+  return res.rows[0]?.value || "1,2,2,1,x";
 }
 
 /**
@@ -92,6 +114,7 @@ async function getPendingTips(client, packageId) {
 /**
  * Main payment processing function.
  * Called asynchronously after M‑Pesa callback.
+ * Handles both normal packages and subscription (jackpot) payments.
  */
 async function processPayment(paymentId, transaction) {
   const { mpesaRef, phoneNumber, amount } = transaction;
@@ -109,7 +132,71 @@ async function processPayment(paymentId, transaction) {
       [phoneNumber],
     );
 
-    //  Match package
+    // Subscription Handling: If amount matches subscription price, treat as subscription purchase
+    const subscriptionPrice = await getSubscriptionPrice();
+    //  Check if subscription is enabled
+    const enabledRes = await pool.query(
+        `SELECT value FROM system_settings WHERE key = 'subscription_enabled'`
+    );
+
+    const subscriptionEnabled = enabledRes.rows[0]?.value !== 'false'; // default true
+
+
+    if (subscriptionEnabled && amount === subscriptionPrice) {
+      logger.info(`Payment ${mpesaRef} matches subscription price (${subscriptionPrice})`);
+
+      // Subscriptions are tracked separately via purchases.is_subscription = true
+
+      // Create purchase record (mark as subscription, NO package_id)
+      await client.query(
+          `INSERT INTO purchases (phone_number, payment_id, amount_paid, is_subscription)
+           VALUES ($1, $2, $3, true)`,
+          [phoneNumber, paymentId, amount]
+      );
+
+      // Update customer subscription counters (NO package reference)
+      await client.query(
+          `INSERT INTO customers (phone_number, total_subscriptions, total_subscription_amount, total_purchases, is_active)
+           VALUES ($1, 1, $2, 1, true)
+             ON CONFLICT (phone_number) DO UPDATE
+             SET total_subscriptions = customers.total_subscriptions + 1,
+             total_subscription_amount = customers.total_subscription_amount + EXCLUDED.total_subscription_amount,
+             total_purchases = customers.total_purchases + 1,
+             is_active = true`,
+          [phoneNumber, amount]
+      );
+
+      // Mark payment as matched and resolved (NO package_id)
+      await client.query(
+          `UPDATE payments
+     SET status = 'matched', resolved = true, matched_package_id = NULL
+     WHERE id = $1`,
+          [paymentId]
+      );
+
+      await client.query("COMMIT");
+      logger.info(`Subscription payment ${mpesaRef} committed for ${phoneNumber}`);
+
+      // Send subscription tips (outside transaction)
+      const tipsTemplate = await getSubscriptionTipsTemplate();
+      try {
+        await sendSMS(phoneNumber, tipsTemplate, "subscription_tips");
+        logger.info(`Subscription tips sent to ${phoneNumber}`);
+      } catch (smsErr) {
+        logger.error(`Failed to send subscription tips to ${phoneNumber}: ${smsErr.message}`);
+      }
+
+      // Recalculate active tier (since total_purchases increased)
+      try {
+        await updateActiveTier(phoneNumber);
+      } catch (tierErr) {
+        logger.error(`Tier update failed for ${phoneNumber}: ${tierErr.message}`);
+      }
+
+      return; // Subscription handled – stop further processing
+    }
+
+
     const { status, exact, lower } = await matchPackage(amount);
     logger.info(`Match result for ${mpesaRef}: ${status}`, {
       exact: exact?.id,
@@ -185,27 +272,19 @@ async function processPayment(paymentId, transaction) {
       if (finalStatus === "matched") {
         await client.query(
           `INSERT INTO purchases (phone_number, package_id, payment_id, amount_paid)
-         VALUES ($1, $2, $3, $4)`,
+           VALUES ($1, $2, $3, $4)`,
           [phoneNumber, packageId, paymentId, amount],
         );
-        //  Upsert customer
+        // Upsert customer (standard, not subscription)
         await client.query(
           `INSERT INTO customers (phone_number, total_purchases, is_active)
-         VALUES ($1, 1, true)
-         ON CONFLICT (phone_number) DO UPDATE
-         SET total_purchases = customers.total_purchases + 1,
-             is_active = true,
-             updated_at = NOW()`,
+           VALUES ($1, 1, true)
+           ON CONFLICT (phone_number) DO UPDATE
+           SET total_purchases = customers.total_purchases + 1,
+               is_active = true,
+               updated_at = NOW()`,
           [phoneNumber],
         );
-
-        // // Update contact's total received amount (for potential tier)
-        // await client.query(
-        //   `UPDATE contacts
-        //  SET total_received_amount = total_received_amount + $1
-        //  WHERE phone_number = $2`,
-        //   [amount, phoneNumber],
-        // );
       }
 
       // Fetch pending tips (needed for SMS after commit)
@@ -219,42 +298,43 @@ async function processPayment(paymentId, transaction) {
       try {
         await updateActiveTier(phoneNumber);
       } catch (tierErr) {
-        // Non-critical — log and continue
         logger.error(`Tier update failed for ${phoneNumber}: ${tierErr.message}`);
       }
     }
 
     // Send SMS outside transaction (non‑critical)
+    // Send SMS outside transaction (non‑critical)
     if (shouldSendTips && pendingTips.length > 0) {
       try {
-        // Send payment confirmation using template
-        const confirmTemplate = await getTemplate(
-          "payment_confirmation_template",
+        // Check if payment confirmation is enabled
+        const confirmEnabledRes = await pool.query(
+            `SELECT value FROM system_settings WHERE key = 'payment_confirmation_enabled'`
         );
-        const confirmMsg = confirmTemplate.replace("{amount}", amount);
-        await sendSMS(phoneNumber, confirmMsg, "payment_confirmation", null);
+        const confirmEnabled = confirmEnabledRes.rows[0]?.value !== 'false'; // default true
 
-        // Send tips delivery using template
+        if (confirmEnabled) {
+          // Send payment confirmation using template
+          const confirmTemplate = await getTemplate("payment_confirmation_template");
+          const confirmMsg = confirmTemplate.replace("{amount}", amount);
+          await sendSMS(phoneNumber, confirmMsg, "payment_confirmation");
+        }
+
+        // Always send tips delivery
         const tipsTemplate = await getTemplate("tips_delivery_template");
         const tipsText = pendingTips
-          .map((tip, idx) => `${idx + 1}. ${tip.game_name} - ${tip.prediction}`)
-          .join("\n");
+            .map((tip, idx) => `${idx + 1}. ${tip.game_name} - ${tip.prediction}`)
+            .join("\n");
         const deliveryMsg = tipsTemplate.replace("{tips}", tipsText);
-        await sendSMS(phoneNumber, deliveryMsg, "tips_delivery", null);
+        await sendSMS(phoneNumber, deliveryMsg, "tips_delivery");
 
         logger.info(
-          `SMS sent to ${phoneNumber} for payment ${mpesaRef} (${pendingTips.length} tips)`,
+            `SMS sent to ${phoneNumber} for payment ${mpesaRef} (${pendingTips.length} tips)`,
         );
       } catch (smsErr) {
-        // Log but do not throw – payment already recorded
-        logger.error(
-          `SMS sending failed for ${phoneNumber}: ${smsErr.message}`,
-        );
+        logger.error(`SMS sending failed for ${phoneNumber}: ${smsErr.message}`);
       }
     } else if (shouldSendTips && pendingTips.length === 0) {
-      logger.warn(
-        `No pending tips found for package ${packageId} (payment ${mpesaRef})`,
-      );
+      logger.warn(`No pending tips found for package ${packageId} (payment ${mpesaRef})`);
     }
 
     logger.info(
@@ -265,9 +345,7 @@ async function processPayment(paymentId, transaction) {
     logger.error(`Payment processing error for ${mpesaRef}: ${err.message}`);
 
     // Mark payment as failed so admin can review
-    await pool.query(`UPDATE payments SET status = 'failed' WHERE id = $1`, [
-      paymentId,
-    ]);
+    await pool.query(`UPDATE payments SET status = 'failed' WHERE id = $1`, [paymentId]);
     throw err;
   } finally {
     client.release();

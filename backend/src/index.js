@@ -52,9 +52,7 @@ app.get("/health", (req, res) => {
   res.status(200).json({ status: "ok" });
 });
 
-// / ── Public: M-Pesa callback — own strict limiter, no auth ────────────────────
-// mpesaLimiter is applied directly in the payments router on the specific route.
-// Apply the standard limiter at app level for everything else, then override below.
+// Apply rate limiters
 app.use(standardLimiter);
 
 // Routes
@@ -85,6 +83,29 @@ const server = app.listen(PORT, async () => {
   await recoverStuckPayments();
   setInterval(recoverStuckPayments, 5 * 60 * 1000);
 });
+
+
+const softDeleteOldMessages = async () => {
+    try {
+        const { pool } = require('./config/db');
+        // Delete messages older than 30 days that are already sent
+        const result = await pool.query(
+            `UPDATE messages
+       SET deleted_at = NOW()
+       WHERE status IN ('sent', 'failed')
+         AND created_at < NOW() - INTERVAL '90 days'
+         AND deleted_at IS NULL`
+        );
+        if (result.rowCount > 0) {
+            logger.info(`Soft-deleted ${result.rowCount} old messages`);
+        }
+    } catch (err) {
+        logger.error(`Soft delete error: ${err.message}`);
+    }
+};
+// Run every day at 2 AM
+setInterval(softDeleteOldMessages, 24 * 60 * 60 * 1000);
+
 
 
 // Graceful shutdown on OS signals

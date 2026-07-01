@@ -1,3 +1,4 @@
+// app/lib/uploadService.js
 /**
  * Upload Service – module‑level singleton for CSV uploads.
  * Manages file queue, progress, and results.

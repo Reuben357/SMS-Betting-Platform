@@ -1,14 +1,19 @@
-import { getAccessToken } from "@auth0/nextjs-auth0";
+import { connection } from 'next/server';
+import { auth0 } from "@/lib/auth0";
 import { NextResponse } from "next/server";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export async function GET(req) {
   try {
-    const res = new NextResponse();
-    const { accessToken } = await getAccessToken(req, res);
+    const { token: accessToken } = await auth0.getAccessToken();
 
-    const backendRes = await fetch(`${API_URL}/api/contacts/uploads`, {
+    // Forward pagination params to backend
+    const { searchParams } = new URL(req.url);
+    const page = searchParams.get("page") || "1";
+    const limit = searchParams.get("limit") || "15";
+
+    const backendRes = await fetch(`${API_URL}/api/contacts/uploads?page=${page}&limit=${limit}`, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',

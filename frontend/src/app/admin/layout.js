@@ -1,13 +1,13 @@
-import { getSession } from '@auth0/nextjs-auth0';
+import { connection } from 'next/server';
+import { auth0 } from '@/lib/auth0';
 import { redirect } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 
 export default async function AdminLayout({ children }) {
-  const session = await getSession();
-
-  if (!session) {
-    redirect('/api/auth/login');
-  }
+    const session = await auth0.getSession();
+    if (!session) {
+        redirect('/api/auth/login?returnTo=/admin/dashboard');
+    }
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>

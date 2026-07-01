@@ -8,7 +8,7 @@ const { logger } = require("../middleware/errorHandler");
  */
 async function getMessages(req, res) {
   const page = Math.max(1, parseInt(req.query.page) || 1);
-  const limit = Math.min(100, parseInt(req.query.limit) || 50);
+  const limit = Math.min(10000, parseInt(req.query.limit) || 50);
   const offset = (page - 1) * limit;
 
   const { phone, message_type, status } = req.query;
@@ -31,8 +31,9 @@ async function getMessages(req, res) {
       params.push(status);
     }
 
-    const where =
-      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const where = conditions.length > 0
+        ? `WHERE ${conditions.join(" AND ")} AND m.deleted_at IS NULL`
+        : `WHERE m.deleted_at IS NULL`;
 
     const countRes = await pool.query(
       `SELECT COUNT(*) FROM messages m ${where}`,
@@ -43,7 +44,7 @@ async function getMessages(req, res) {
     const result = await pool.query(
       `SELECT
          m.id, m.recipient_phone, m.message_type, m.content,
-         m.status, m.created_at,
+         m.status, m.created_at, m.audience_type,
          COALESCE(u.email, 'System') AS sent_by_email
        FROM messages m
        LEFT JOIN users u ON u.id = m.sent_by

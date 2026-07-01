@@ -39,8 +39,9 @@ export default function UploadForm({ onUploadComplete }) {
   const handleDrop = (e) => {
     e.preventDefault();
     setIsDragging(false);
+    const allowedExtensions = ['.csv', '.txt', '.json'];
     const dropped = Array.from(e.dataTransfer.files).filter((f) =>
-      f.name.endsWith(".csv"),
+        allowedExtensions.some(ext => f.name.toLowerCase().endsWith(ext))
     );
     setFiles((prev) => [...prev, ...dropped]);
   };
@@ -71,15 +72,15 @@ export default function UploadForm({ onUploadComplete }) {
             fontWeight: 600,
           }}
         >
-          {active ? "Processing..." : "Drag CSV files here"}
+          {active ? "Processing..." : "Drag CSV, TXT,  or JSON files here"}
         </p>
         <input
-          id="csv-up"
-          type="file"
-          accept=".csv"
-          multiple
-          onChange={(e) => setFiles(Array.from(e.target.files))}
-          style={{ display: "none" }}
+            id="csv-up"
+            type="file"
+            accept=".csv, .txt, .json, text/plain, application/json"
+            multiple
+            onChange={(e) => setFiles(prev => [...prev, ...Array.from(e.target.files)])}
+            style={{ display: "none" }}
         />
         <label
           htmlFor="csv-up"

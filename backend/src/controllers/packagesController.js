@@ -11,29 +11,28 @@ const { logger } = require("../middleware/errorHandler");
 async function getPackages(req, res) {
   try {
     const result = await pool.query(`
-      SELECT 
+      SELECT
         p.id,
         p.name,
         p.price,
         p.game_count,
         p.is_active,
         p.created_at,
-        COUNT(t.id) FILTER (WHERE t.status = 'pending') AS pending_tips,
+        COUNT(t.id) FILTER (WHERE t.status = 'pending' AND t.deleted_at IS NULL) AS pending_tips,
         COUNT(t.id) AS total_tips
       FROM packages p
-      LEFT JOIN tips t ON t.package_id = p.id
+             LEFT JOIN tips t ON t.package_id = p.id AND t.deleted_at IS NULL
+      WHERE p.deleted_at IS NULL
       GROUP BY p.id
       ORDER BY p.price ASC
     `);
 
     res.json({ packages: result.rows });
-
   } catch (err) {
     logger.error("getPackages error:", err.message);
     res.status(500).json({ error: "Failed to fetch packages." });
   }
 }
-
 
 /**
  * POST /api/packages
@@ -43,23 +42,22 @@ async function getPackages(req, res) {
 async function createPackage(req, res) {
   const { name, price, game_count } = req.body;
 
-  if (!name || !price == null || !game_count == null) {
+  if (!name || price == null || game_count == null) {
     return res
-      .status(400)
-      .json({ error: "Name, price, and game count are required." });
+        .status(400)
+        .json({ error: "Name, price, and game count are required." });
   }
 
   try {
     const result = await pool.query(
-      `INSERT INTO packages (name, price, game_count, is_active)
-       VALUES ($1, $2, $3, true)
-       RETURNING *`,
-      [name, price, game_count],
+        `INSERT INTO packages (name, price, game_count, is_active)
+         VALUES ($1, $2, $3, true)
+           RETURNING *`,
+        [name, price, game_count]
     );
     res.status(201).json({ package: result.rows[0] });
   } catch (err) {
     if (err.code === "23505") {
-      // Unique violation from partial index on price WHERE is_active = true
       return res.status(409).json({
         error: `An active package already exists with a price of KES ${price}. Each package must have a unique price.`,
       });
@@ -68,7 +66,6 @@ async function createPackage(req, res) {
     res.status(500).json({ error: "Failed to create package." });
   }
 }
-
 
 /**
  * PUT /api/packages/:id
@@ -79,20 +76,27 @@ async function updatePackage(req, res) {
   const { id } = req.params;
   const { name, price, game_count } = req.body;
 
-  if (!name || !price == null || !game_count == null) {
+  if (!name || price == null || game_count == null) {
     return res
-      .status(400)
-      .json({ error: "Name, price, and game count are required." });
+        .status(400)
+        .json({ error: "Name, price, and game count are required." });
   }
 
   try {
-    // Check if reducing game_count conflicts with existing active tips
-    const existingTips = await pool.query(
-      `SELECT COUNT(*) FROM tips WHERE package_id = $1 AND status = 'pending'`,
-      [id],
+    // Check if package is soft-deleted (using pool directly)
+    const pkgCheck = await pool.query(
+        `SELECT deleted_at FROM packages WHERE id = $1`,
+        [id]
     );
+    if (pkgCheck.rows[0]?.deleted_at !== null) {
+      return res.status(400).json({ error: "Cannot modify a soft-deleted package." });
+    }
 
-    // PostgreSQL count returns a string; use Number() or parseInt() for comparison
+    // Check if reducing game_count conflicts with existing pending tips
+    const existingTips = await pool.query(
+        `SELECT COUNT(*) FROM tips WHERE package_id = $1 AND status = 'pending'`,
+        [id]
+    );
     const currentTipCount = Number(existingTips.rows[0].count);
 
     if (currentTipCount > game_count) {
@@ -102,11 +106,11 @@ async function updatePackage(req, res) {
     }
 
     const result = await pool.query(
-      `UPDATE packages
-       SET name = $1, price = $2, game_count = $3
-       WHERE id = $4
-       RETURNING *`,
-      [name, price, game_count, id],
+        `UPDATE packages
+         SET name = $1, price = $2, game_count = $3
+         WHERE id = $4
+           RETURNING *`,
+        [name, price, game_count, id]
     );
 
     if (result.rows.length === 0) {
@@ -120,12 +124,10 @@ async function updatePackage(req, res) {
         error: `Another active package already has a price of KES ${price}. Each package must have a unique price.`,
       });
     }
-
     logger.error("updatePackage error:", err.message);
     res.status(500).json({ error: "Failed to update package." });
   }
 }
-
 
 /**
  * PUT /api/packages/:id/deactivate
@@ -139,27 +141,34 @@ async function deactivatePackage(req, res) {
   try {
     await client.query("BEGIN");
 
+    // Check if package is soft-deleted (using the same client)
+    const pkgCheck = await client.query(
+        `SELECT deleted_at FROM packages WHERE id = $1`,
+        [id]
+    );
+    if (pkgCheck.rows[0]?.deleted_at !== null) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "Cannot modify a soft-deleted package." });
+    }
+
     // Deactivate the package
     const deactivateRes = await client.query(
-      `UPDATE packages SET is_active = false WHERE id = $1 RETURNING id`,
-      [id],
+        `UPDATE packages SET is_active = false WHERE id = $1 RETURNING id`,
+        [id]
     );
     if (deactivateRes.rows.length === 0) {
       await client.query("ROLLBACK");
       return res.status(404).json({ error: "Package not found." });
     }
 
-    // Mark all pending tips as lost (so they are not sent to future buyers)
-    // const tipsUpdateRes = await client.query(
+    // Optionally, mark pending tips as lost (commented out in original)
+    // await client.query(
     //   `UPDATE tips SET status = 'lost' WHERE package_id = $1 AND status = 'pending'`,
-    //   [id],
+    //   [id]
     // );
 
     await client.query("COMMIT");
-    res.json({
-      message: "Package deactivated successfully",
-      // affected_tips: tipsUpdateRes.rowCount,
-    });
+    res.json({ message: "Package deactivated successfully" });
   } catch (err) {
     await client.query("ROLLBACK");
     logger.error(`deactivatePackage error: ${err.message}`);
@@ -168,7 +177,6 @@ async function deactivatePackage(req, res) {
     client.release();
   }
 }
-
 
 /**
  * PUT /api/packages/:id/reactivate
@@ -179,9 +187,18 @@ async function deactivatePackage(req, res) {
 async function reactivatePackage(req, res) {
   const { id } = req.params;
   try {
+    // Check if package is soft-deleted – if it is, we cannot reactivate
+    const pkgCheck = await pool.query(
+        `SELECT deleted_at FROM packages WHERE id = $1`,
+        [id]
+    );
+    if (pkgCheck.rows[0]?.deleted_at !== null) {
+      return res.status(400).json({ error: "Cannot reactivate a soft-deleted package." });
+    }
+
     const result = await pool.query(
-      `UPDATE packages SET is_active = true WHERE id = $1 RETURNING *`,
-      [id],
+        `UPDATE packages SET is_active = true WHERE id = $1 RETURNING *`,
+        [id]
     );
 
     if (result.rows.length === 0) {
@@ -192,11 +209,9 @@ async function reactivatePackage(req, res) {
   } catch (err) {
     if (err.code === "23505") {
       return res.status(409).json({
-        error:
-          "Cannot reactivate — another active package already has this price.",
+        error: "Cannot reactivate — another active package already has this price.",
       });
     }
-
     logger.error("reactivatePackage error:", err.message);
     res.status(500).json({ error: "Failed to reactivate package." });
   }

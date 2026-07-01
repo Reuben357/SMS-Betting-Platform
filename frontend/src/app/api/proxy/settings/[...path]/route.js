@@ -1,13 +1,15 @@
-import { getAccessToken } from "@auth0/nextjs-auth0";
+import { connection } from 'next/server';
+import { auth0 } from "@/lib/auth0";
 import { NextResponse } from "next/server";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export async function GET(req, { params }) {
   try {
-    const res = new NextResponse();
-    const { accessToken } = await getAccessToken(req, res);
-    const path = params.path?.join("/") || "";
+    //
+    const { token: accessToken } = await auth0.getAccessToken();
+    const resolvedParams = await params;
+    const path = resolvedParams.path?.join("/") || "";
     const backendRes = await fetch(
       `${API_URL}/api/settings/${path}${new URL(req.url).search}`,
       {
@@ -23,9 +25,10 @@ export async function GET(req, { params }) {
 
 export async function PUT(req, { params }) {
   try {
-    const res = new NextResponse();
-    const { accessToken } = await getAccessToken(req, res);
-    const path = params.path?.join("/") || "";
+    //
+    const { token: accessToken } = await auth0.getAccessToken();
+    const resolvedParams = await params;
+    const path = resolvedParams.path?.join("/") || "";
     const body = await req.json();
     const backendRes = await fetch(`${API_URL}/api/settings/${path}`, {
       method: "PUT",

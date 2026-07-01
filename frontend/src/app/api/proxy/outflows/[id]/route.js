@@ -1,0 +1,50 @@
+import { connection } from 'next/server';
+import { auth0 } from "@/lib/auth0";
+import { NextResponse } from "next/server";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+export async function PUT(req, { params }) {
+    try {
+        //
+        const { token: accessToken } = await auth0.getAccessToken();
+        const { id } = await params;
+        const body = await req.json();
+
+        const backendRes = await fetch(`${API_URL}/api/outflows/${id}`, {
+            method: "PUT",
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(body),
+            cache: "no-store",
+        });
+
+        const data = await backendRes.json();
+        return NextResponse.json(data, { status: backendRes.status });
+    } catch (err) {
+        return NextResponse.json({ error: err.message }, { status: 500 });
+    }
+}
+
+export async function DELETE(req, { params }) {
+    try {
+        //
+        const { token: accessToken } = await auth0.getAccessToken();
+        const { id } = await params;
+
+        const backendRes = await fetch(`${API_URL}/api/outflows/${id}`, {
+            method: "DELETE",
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+            },
+            cache: "no-store",
+        });
+
+        const data = await backendRes.json();
+        return NextResponse.json(data, { status: backendRes.status });
+    } catch (err) {
+        return NextResponse.json({ error: err.message }, { status: 500 });
+    }
+}

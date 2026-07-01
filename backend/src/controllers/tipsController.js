@@ -70,7 +70,6 @@ async function createTip(req, res) {
     client.release();
   }
 }
-
 /**
  * GET /api/tips
  * Retrieve ALL tips (pending, won, lost) for admin management.
@@ -83,7 +82,7 @@ async function getTips(req, res) {
       SELECT t.*, p.name AS package_name
       FROM tips t
       JOIN packages p ON p.id = t.package_id
-      WHERE 1=1
+      WHERE t.deleted_at IS NULL
     `;
     const params = [];
     if (package_id) {
@@ -131,28 +130,53 @@ async function updateTipOutcome(req, res) {
     ]);
 
     const pendingRes = await client.query(
-      `SELECT COUNT(*) FROM tips WHERE package_id = $1 AND status = 'pending'`,
+      `SELECT COUNT(*) FROM tips WHERE package_id = $1 AND status = 'pending' AND deleted_at IS NULL `,
       [packageId],
     );
     const pendingCount = parseInt(pendingRes.rows[0].count);
 
+    let softDeleted = false;
+    let packageName = null;
+
     if (pendingCount === 0) {
+      // Get package name before soft‑delete
+      const pkgNameRes = await client.query(
+          `SELECT name FROM packages WHERE id = $1`,
+          [packageId]
+      );
+      packageName = pkgNameRes.rows[0]?.name || 'Package';
+
+      // Soft-delete the package
       await client.query(
-        `UPDATE packages SET is_active = false WHERE id = $1`,
+        `UPDATE packages SET is_active = false, deleted_at = NOW() WHERE id = $1`,
         [packageId],
       );
+
+      // Soft-delete all tips belonging to this package
+      await client.query(
+          `UPDATE tips SET deleted_at = NOW() WHERE package_id = $1 AND deleted_at IS NULL`,
+          [packageId]
+      );
+      softDeleted = true;
       logger.info(`Package ${packageId} deactivated – no pending tips left.`);
     }
 
     await client.query("COMMIT");
-    res.json({ message: "Tip outcome updated." });
+
+    res.json({
+      message: "Tip outcome updated.",
+      softDeleted,
+      packageName,
+    });
   } catch (err) {
     await client.query("ROLLBACK");
     logger.error(`updateTipOutcome error: ${err.message}`);
     res.status(500).json({ error: "Failed to update tip." });
-  } finally {
+  } finally {cd
     client.release();
   }
+
+
 }
 
 /**

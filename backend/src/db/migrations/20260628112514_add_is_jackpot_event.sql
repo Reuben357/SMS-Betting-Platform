@@ -1,0 +1,1 @@
+ALTER TABLE contact_events ADD COLUMN is_jackpot_event BOOLEAN DEFAULT FALSE;

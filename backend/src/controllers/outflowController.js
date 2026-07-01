@@ -1,7 +1,17 @@
 const { pool } = require("../config/db");
 const { logger } = require("../middleware/errorHandler");
+const redis = require("../config/redis");
 
-const VALID_CATEGORIES = ["Domain", "VPS", "SMS Gateway", "Other"];
+const VALID_CATEGORIES = [
+  "Domain",
+  "VPS",
+  "SMS Gateway",
+  "Malipo",
+  "Marketing",
+  "Salaries",
+  "Infrastructure",
+  "Other"
+];
 
 /**
  * GET /api/outflow
@@ -80,4 +90,77 @@ async function createOutflow(req, res) {
   }
 }
 
-module.exports = { getOutflow, createOutflow };
+/**
+ * PUT /api/outflow/:id
+ * Update an existing expense.
+ */
+async function updateOutflow(req, res) {
+  const { id } = req.params;
+  const { amount, description, category } = req.body;
+
+  if (!amount || !description || !category) {
+    return res.status(400).json({ error: "Amount, description, and category are required." });
+  }
+
+  if (!VALID_CATEGORIES.includes(category)) {
+    return res.status(400).json({
+      error: `Category must be one of: ${VALID_CATEGORIES.join(", ")}.`,
+    });
+  }
+
+  const parsedAmount = parseInt(amount);
+  if (isNaN(parsedAmount) || parsedAmount <= 0) {
+    return res.status(400).json({ error: "Amount must be a positive integer." });
+  }
+
+  try {
+    const result = await pool.query(
+        `UPDATE outflow
+       SET amount = $1, description = $2, category = $3
+       WHERE id = $4
+       RETURNING id, amount, description, category, created_at`,
+        [parsedAmount, description, category, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Expense not found." });
+    }
+
+    // Clear the accounting summary cache so the next fetch is fresh
+    await redis.del("accounting_summary");
+
+    res.json({ outflow: result.rows[0] });
+  } catch (err) {
+    logger.error(`updateOutflow error: ${err.message}`);
+    res.status(500).json({ error: "Failed to update expense." });
+  }
+}
+
+/**
+ * DELETE /api/outflow/:id
+ * Delete an expense.
+ */
+async function deleteOutflow(req, res) {
+  const { id } = req.params;
+
+  try {
+    const result = await pool.query(
+        `DELETE FROM outflow WHERE id = $1 RETURNING id`,
+        [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Expense not found." });
+    }
+
+    // Clear the accounting summary cache
+    await redis.del("accounting_summary");
+
+    res.json({ message: "Expense deleted successfully." });
+  } catch (err) {
+    logger.error(`deleteOutflow error: ${err.message}`);
+    res.status(500).json({ error: "Failed to delete expense." });
+  }
+}
+
+module.exports = { getOutflow, createOutflow, updateOutflow, deleteOutflow };

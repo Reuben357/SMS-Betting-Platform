@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useUser } from "@auth0/nextjs-auth0/client";
+import { useUser } from "@auth0/nextjs-auth0";
 import { isAdmin } from "@/lib/auth";
 import {
   LayoutDashboard,
@@ -14,6 +14,7 @@ import {
   Settings,
   LogOut,
   UsersRound,
+  Ticket
 } from "lucide-react";
 
 // Midnight Gold color palette
@@ -28,15 +29,17 @@ const navItems = [
   { label: "Tips", href: "/admin/tips", icon: Zap, adminOnly: false },
   { label: "Active Customers", href: "/admin/active-customers", icon: UsersRound, adminOnly: false },
   { label: "Packages", href: "/admin/packages", icon: Package, adminOnly: false },
-  { label: "Payments", href: "/admin/payments", icon: CreditCard, adminOnly: false },
+  { label: "Subscriptions", href: "/admin/subscriptions", icon: Ticket, adminOnly: false },
+  { label: "Jackpot Customers", href: "/admin/jackpot-customers", icon: Users, adminOnly: false },
+  { label: "Payments", href: "/admin/payments", icon: CreditCard, adminOnly: true },
   { label: "Accounting", href: "/admin/accounting", icon: PieChart, adminOnly: true },
   { label: "SMS", href: "/admin/sms", icon: MessageSquare, adminOnly: false },
   { label: "Tier Thresholds", href: "/admin/tiers", icon: Settings, adminOnly: false },
 ];
 
 export default function Sidebar() {
-  const { user } = useUser();
-  const pathname = usePathname();
+    const { user } = useUser({ route: "/api/auth/me" });
+    const pathname = usePathname();
   const admin = isAdmin(user);
 
   return (
@@ -56,7 +59,7 @@ export default function Sidebar() {
           style={{
             fontSize: "20px",
             fontWeight: 800,
-            color: GOLD,
+            color: TEXT_LIGHT,
             margin: 0,
             letterSpacing: "-0.5px",
           }}
@@ -66,7 +69,7 @@ export default function Sidebar() {
         <p
           style={{
             fontSize: "11px",
-            color: GOLD_DARK,
+            color: TEXT_LIGHT,
             marginTop: "4px",
             textTransform: "uppercase",
             letterSpacing: "0.5px",

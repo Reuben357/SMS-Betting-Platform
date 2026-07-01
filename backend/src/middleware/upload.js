@@ -1,38 +1,41 @@
 const multer = require('multer');
+const path = require('path');
 
-// Store the file in memory as a Buffer.
 const storage = multer.memoryStorage();
 
-// File filter
 const fileFilter = (req, file, cb) => {
-  const isCSVMime = file.mimetype === 'text/csv' ||
-                    file.mimetype === 'text/plain' ||
-                    file.mimetype === 'application/vnd.ms-excel';
-  const isCSVExt = file.originalname.toLowerCase().endsWith('.csv');
-
-  if (isCSVMime || isCSVExt) {
+  const allowedMimes = [
+    'text/csv',
+    'text/plain',
+    'application/json',
+    'application/octet-stream',
+  ];
+  const allowedExts = ['.csv', '.txt', '.json'];
+  const ext = path.extname(file.originalname).toLowerCase();
+  const isAllowedMime = allowedMimes.includes(file.mimetype);
+  const isAllowedExt = allowedExts.includes(ext);
+  
+  if (isAllowedMime || isAllowedExt) {
     cb(null, true);
   } else {
-    cb(new Error('Only CSV files are accepted.'), false);
+    cb(new Error('Unsupported file type. Please upload CSV, TXT, or JSON files.'), false);
   }
 };
 
 const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
+  limits: {
+    fileSize: 50 * 1024 * 1024, //50 MB
+    fields: 10
+  },
 });
 
-// Empty file guard
 function rejectEmptyFile(req, res, next) {
-  if (!req.file) {
-    return next(); // Let the controller handle missing file
-  }
-
+  if (!req.file) return next();
   if (req.file.size === 0) {
     return res.status(400).json({ error: 'The uploaded file is empty.' });
   }
-
   next();
 }
 

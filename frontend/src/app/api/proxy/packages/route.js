@@ -1,12 +1,13 @@
-import { getAccessToken } from "@auth0/nextjs-auth0";
+import { connection } from 'next/server';
+import { auth0 } from "@/lib/auth0";
 import { NextResponse } from "next/server";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export async function GET(req) {
   try {
-    const res = new NextResponse();
-    const { accessToken } = await getAccessToken(req, res);
+    //
+    const { token: accessToken } = await auth0.getAccessToken();
     const backendRes = await fetch(`${API_URL}/api/packages`, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -23,8 +24,8 @@ export async function GET(req) {
 
 export async function POST(req) {
   try {
-    const res = new NextResponse();
-    const { accessToken } = await getAccessToken(req, res);
+    //
+    const { token: accessToken } = await auth0.getAccessToken();
     const body = await req.json();
     const backendRes = await fetch(`${API_URL}/api/packages`, {
       method: "POST",

@@ -11,11 +11,11 @@ async function testToken() {
       { headers: { Authorization: `Basic ${auth}` } },
     );
     console.log(
-      "✅ Token generated:",
+      "Token generated:",
       res.data.access_token?.slice(0, 20) + "...",
     );
   } catch (err) {
-    console.error("❌ Token failed:", err.response?.data || err.message);
+    console.error("Token failed:", err.response?.data || err.message);
   }
 }
 testToken();

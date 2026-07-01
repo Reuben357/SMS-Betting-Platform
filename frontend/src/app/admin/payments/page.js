@@ -3,66 +3,68 @@
 import { useState, useEffect, useCallback } from "react";
 import TopBar from "@/components/TopBar";
 import SendSmsModal from "@/components/SendSmsModal";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import ScrollableSelect from "@/components/ui/ScrollableSelect";
+import { ChevronLeft, ChevronRight, ChevronUp } from "lucide-react";
+import { BG_DARK, CARD_BG, TEXT_PRIMARY, TEXT_SECONDARY, GOLD, DANGER, SUCCESS } from "@/lib/theme";
 
 const IconCheck = () => (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="3"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M20 6 9 17l-5-5" />
-  </svg>
+    <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+    >
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
 );
 const IconAlert = () => (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="3"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <circle cx="12" cy="12" r="10" />
-    <line x1="12" y1="8" x2="12" y2="12" />
-    <line x1="12" y1="16" x2="12.01" y2="16" />
-  </svg>
+    <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="8" x2="12" y2="12" />
+      <line x1="12" y1="16" x2="12.01" y2="16" />
+    </svg>
 );
 const IconClock = () => (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <circle cx="12" cy="12" r="10" />
-    <polyline points="12 6 12 12 16 14" />
-  </svg>
+    <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
+    </svg>
 );
 const IconSms = () => (
-  <svg
-    width="16"
-    height="16"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-  </svg>
+    <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+    >
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
 );
 
 const STATUS_CONFIG = {
@@ -108,13 +110,6 @@ const STATUS_CONFIG = {
     border: "#243040",
     icon: <IconClock />,
   },
-  // pending_retry: {
-  //   label: "Pending Retry",
-  //   color: "#B3945B",
-  //   bg: "#231E14",
-  //   border: "#352A18",
-  //   icon: <IconClock />,
-  // },
   failed: {
     label: "Failed",
     color: "#E07070",
@@ -133,22 +128,22 @@ function StatusBadge({ status }) {
     icon: <IconClock />,
   };
   return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: "6px",
-        padding: "4px 10px",
-        borderRadius: "6px",
-        fontSize: "11px",
-        fontWeight: "700",
-        color: cfg.color,
-        backgroundColor: cfg.bg,
-        border: `1px solid ${cfg.border}`,
-        textTransform: "uppercase",
-        letterSpacing: "0.04em",
-      }}
-    >
+      <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "6px",
+            padding: "4px 10px",
+            borderRadius: "6px",
+            fontSize: "11px",
+            fontWeight: "700",
+            color: cfg.color,
+            backgroundColor: cfg.bg,
+            border: `1px solid ${cfg.border}`,
+            textTransform: "uppercase",
+            letterSpacing: "0.04em",
+          }}
+      >
       {cfg.icon} {cfg.label}
     </span>
   );
@@ -156,35 +151,35 @@ function StatusBadge({ status }) {
 
 function StatCard({ label, value, color, sub }) {
   return (
-    <div style={styles.statCard}>
-      <div
-        style={{
-          fontSize: "11px",
-          color: "#7A6A50",
-          fontWeight: "700",
-          textTransform: "uppercase",
-          letterSpacing: "0.06em",
-        }}
-      >
-        {label}
-      </div>
-      <div
-        style={{
-          fontSize: "28px",
-          fontWeight: "800",
-          color: color || "#B3945B",
-          marginTop: "6px",
-          fontVariantNumeric: "tabular-nums",
-        }}
-      >
-        {typeof value === "number" ? value.toLocaleString() : value}
-      </div>
-      {sub && (
-        <div style={{ fontSize: "12px", color: "#5A4A34", marginTop: "4px" }}>
-          {sub}
+      <div style={styles.statCard}>
+        <div
+            style={{
+              fontSize: "11px",
+              color: "#7A6A50",
+              fontWeight: "700",
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+            }}
+        >
+          {label}
         </div>
-      )}
-    </div>
+        <div
+            style={{
+              fontSize: "28px",
+              fontWeight: "800",
+              color: color || "#B3945B",
+              marginTop: "6px",
+              fontVariantNumeric: "tabular-nums",
+            }}
+        >
+          {typeof value === "number" ? value.toLocaleString() : value}
+        </div>
+        {sub && (
+            <div style={{ fontSize: "12px", color: "#5A4A34", marginTop: "4px" }}>
+              {sub}
+            </div>
+        )}
+      </div>
   );
 }
 
@@ -201,18 +196,29 @@ export default function PaymentsPage() {
   const [smsPhone, setSmsPhone] = useState(null);
   const [limit, setLimit] = useState(15);
   const [gotoPage, setGotoPage] = useState("");
+  const [phoneSearch, setPhoneSearch] = useState("");
 
-    // Helper to generate page numbers (e.g. 1 ... 11 12 13 ... 1143)
+  // Scroll-to-top state
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
+  // Toast state
+  const [toast, setToast] = useState({ visible: false, message: "", type: "" });
+
+  const showToast = (message, type = "success") => {
+    setToast({ visible: true, message, type });
+    setTimeout(() => setToast({ visible: false, message: "", type: "" }), 4000);
+  };
+
+  // Helper to generate page numbers (e.g. 1 ... 11 12 13 ... 1143)
   const getPageNumbers = () => {
     const total = pagesState;
     const current = page;
     const delta = 2;
     let range = [];
     for (
-      let i = Math.max(2, current - delta);
-      i <= Math.min(total - 1, current + delta);
-      i++
+        let i = Math.max(2, current - delta);
+        i <= Math.min(total - 1, current + delta);
+        i++
     ) {
       range.push(i);
     }
@@ -232,17 +238,18 @@ export default function PaymentsPage() {
       });
       if (statusFilter) params.set("status", statusFilter);
       if (resolvedFilter !== "") params.set("resolved", resolvedFilter);
+      if (phoneSearch.trim()) params.set("phone", phoneSearch.trim());
       const res = await fetch(`/api/proxy/payments?${params}`);
       const data = await res.json();
       setPayments(data.payments ?? []);
       setTotal(data.total ?? 0);
-      setPages(data.pages ?? 1);
+      setPagesState(data.pages ?? 1);
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
-  }, [page, limit, statusFilter, resolvedFilter]);
+  }, [page, limit, statusFilter, resolvedFilter, phoneSearch]);
 
   useEffect(() => {
     fetchPayments();
@@ -250,7 +257,16 @@ export default function PaymentsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [statusFilter, resolvedFilter, limit]);
+  }, [statusFilter, resolvedFilter, limit, phoneSearch]);
+
+  // Scroll listener
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowScrollTop(window.scrollY > 300);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const handleResolve = async (id) => {
     setResolving(id);
@@ -260,16 +276,16 @@ export default function PaymentsPage() {
       });
       if (res.ok)
         setPayments((prev) =>
-          prev.map((p) =>
-            p.id === id ? { ...p, resolved: true, status: "matched" } : p,
-          ),
+            prev.map((p) =>
+                p.id === id ? { ...p, resolved: true, status: "matched" } : p,
+            ),
         );
     } finally {
       setResolving(null);
     }
   };
 
-   const handleGoToPage = () => {
+  const handleGoToPage = () => {
     const pageNum = parseInt(gotoPage);
     if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= pagesState) {
       setPage(pageNum);
@@ -279,76 +295,132 @@ export default function PaymentsPage() {
 
   const matchedCount = payments.filter((p) => p.status === "matched").length;
   const flaggedCount = payments.filter((p) =>
-    p.status.startsWith("flagged"),
+      p.status.startsWith("flagged"),
   ).length;
   const unresolvedCount = payments.filter(
-    (p) => !p.resolved && p.status !== "matched",
+      (p) => !p.resolved && p.status !== "matched",
   ).length;
 
   return (
-    <div style={{ background: "#111111", minHeight: "100vh" }}>
-      <TopBar title="System Payments" />
+      <div style={{ background: "#111111", minHeight: "100vh" }}>
+        <TopBar title="System Payments" />
 
-      <div style={styles.container}>
-        {/* Stats Row */}
-        <div style={styles.statsRow}>
-          <StatCard label="Total Transactions" value={total} color="#B3945B" />
-          <StatCard label="Matched" value={matchedCount} color="#8FB87A" />
-          <StatCard
-            label="Flagged Issues"
-            value={flaggedCount}
-            color="#E07070"
-          />
-          <StatCard
-            label="Unresolved"
-            value={unresolvedCount}
-            color="#D4A853"
-          />
-        </div>
+        {/* Toast Notification */}
+        {toast.visible && (
+            <div
+                style={{
+                  position: "fixed",
+                  top: "20px",
+                  right: "20px",
+                  background: toast.type === "error" ? `${DANGER}20` : `${SUCCESS}20`,
+                  border: `1px solid ${toast.type === "error" ? DANGER : SUCCESS}`,
+                  borderRadius: "12px",
+                  padding: "14px 20px",
+                  color: TEXT_PRIMARY,
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  boxShadow: "0 8px 16px rgba(0,0,0,0.4)",
+                  zIndex: 3000,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  maxWidth: "400px",
+                  backdropFilter: "blur(4px)",
+                }}
+            >
+            <span style={{ color: toast.type === "error" ? DANGER : SUCCESS }}>
+              {toast.type === "error" ? "❌" : "✅"}
+            </span>
+              {toast.message}
+            </div>
+        )}
 
-        {/* Action Bar */}
-        <div style={styles.actionBar}>
-          <div style={{ display: "flex", gap: "10px" }}>
-            <select
-              style={styles.select}
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="">All Statuses</option>
-              <option value="matched">Matched</option>
-              <option value="flagged_overpayment">Overpayment</option>
-              <option value="flagged_underpayment">Underpayment</option>
-              <option value="flagged_no_match">No Match</option>
-              <option value="flagged_incomplete_package">
-                Incomplete Package
-              </option>
-              {/* <option value="pending_retry">Pending Retry</option> */}
-              <option value="failed">Failed</option>
-            </select>
-            <select
-              style={styles.select}
-              value={resolvedFilter}
-              onChange={(e) => setResolvedFilter(e.target.value)}
-            >
-              <option value="">All Resolution</option>
-              <option value="false">Unresolved</option>
-              <option value="true">Resolved</option>
-            </select>
+        <div style={styles.container}>
+          {/* Stats Row */}
+          <div style={styles.statsRow}>
+            <StatCard label="Total Transactions" value={total} color="#B3945B" />
+            <StatCard label="Matched" value={matchedCount} color="#8FB87A" />
+            <StatCard
+                label="Flagged Issues"
+                value={flaggedCount}
+                color="#E07070"
+            />
+            <StatCard
+                label="Unresolved"
+                value={unresolvedCount}
+                color="#D4A853"
+            />
           </div>
-          <button
-            onClick={() => {
-              setStatusFilter("");
-              setResolvedFilter("");
-            }}
-            style={styles.clearBtn}
-          >
-            Clear Filters
-          </button>
-        </div>
 
-        <div style={styles.tableWrapper}>
-          <table style={styles.table}>
-            <thead>
+          {/* Action Bar */}
+          <div style={styles.actionBar}>
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+              <div style={{ width: "200px" }}>
+                <ScrollableSelect
+                    value={statusFilter}
+                    onChange={setStatusFilter}
+                    placeholder="All Statuses"
+                    options={[
+                      { value: "", label: "All Statuses" },
+                      { value: "matched", label: "Matched" },
+                      { value: "flagged_overpayment", label: "Overpayment" },
+                      { value: "flagged_underpayment", label: "Underpayment" },
+                      { value: "flagged_no_match", label: "No Match" },
+                      { value: "flagged_incomplete_package", label: "Incomplete Package" },
+                      { value: "failed", label: "Failed" },
+                    ]}
+                />
+              </div>
+              <div style={{ width: "160px" }}>
+                <ScrollableSelect
+                    value={resolvedFilter}
+                    onChange={setResolvedFilter}
+                    placeholder="All Resolution"
+                    options={[
+                      { value: "", label: "All Resolution" },
+                      { value: "false", label: "Unresolved" },
+                      { value: "true", label: "Resolved" },
+                    ]}
+                />
+              </div>
+              {/* Phone search input */}
+              <input
+                  type="text"
+                  placeholder="Search by phone..."
+                  value={phoneSearch}
+                  onChange={(e) => {
+                    setPhoneSearch(e.target.value);
+                    setPage(1);
+                  }}
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: "7px",
+                    border: "1px solid #3A3020",
+                    fontSize: "13px",
+                    fontWeight: "600",
+                    color: "#C8A870",
+                    background: "#242018",
+                    outline: "none",
+                    width: "180px",
+                  }}
+              />
+            </div>
+            <button
+                onClick={() => {
+                  setStatusFilter("");
+                  setResolvedFilter("");
+                  setPhoneSearch("");
+                  setPage(1);
+                }}
+                style={styles.clearBtn}
+            >
+              Clear Filters
+            </button>
+          </div>
+
+          <div style={styles.tableWrapper}>
+            <table style={styles.table}>
+              <thead>
               <tr>
                 <th style={styles.th}>Phone Number</th>
                 <th style={styles.th}>Amount</th>
@@ -357,181 +429,215 @@ export default function PaymentsPage() {
                 <th style={styles.th}>Resolution</th>
                 <th style={{ ...styles.th, textAlign: "right" }}>Actions</th>
               </tr>
-            </thead>
-            <tbody
-              style={{
-                opacity: loading ? 0.5 : 1,
-                transition: "opacity 0.15s",
-              }}
-            >
+              </thead>
+              <tbody
+                  style={{
+                    opacity: loading ? 0.5 : 1,
+                    transition: "opacity 0.15s",
+                  }}
+              >
               {payments.map((p) => (
-                <tr key={p.id} style={styles.tr}>
-                  <td style={styles.td}>
+                  <tr key={p.id} style={styles.tr}>
+                    <td style={styles.td}>
                     <span style={{ fontWeight: "700", color: "#E8DCC8" }}>
                       {p.phone_number}
                     </span>
-                  </td>
-                  <td style={styles.td}>
-                    <div
-                      style={{
-                        fontWeight: "800",
-                        color: "#B3945B",
-                        fontVariantNumeric: "tabular-nums",
-                      }}
-                    >
-                      KES {Number(p.amount).toLocaleString()}
-                      {p.excess_amount > 0 && (
-                        <span
+                    </td>
+                    <td style={styles.td}>
+                      <div
                           style={{
-                            marginLeft: "8px",
-                            fontSize: "10px",
-                            background: "#1A3A2A",
-                            color: "#10B981",
-                            padding: "2px 7px",
-                            borderRadius: "4px",
-                            border: "1px solid #10B98140",
+                            fontWeight: "800",
+                            color: "#B3945B",
+                            fontVariantNumeric: "tabular-nums",
                           }}
-                        >
+                      >
+                        KES {Number(p.amount).toLocaleString()}
+                        {p.excess_amount > 0 && (
+                            <span
+                                style={{
+                                  marginLeft: "8px",
+                                  fontSize: "10px",
+                                  background: "#1A3A2A",
+                                  color: "#10B981",
+                                  padding: "2px 7px",
+                                  borderRadius: "4px",
+                                  border: "1px solid #10B98140",
+                                }}
+                            >
                           +{Number(p.excess_amount).toLocaleString()}
                         </span>
-                      )}
-                    </div>
-                  </td>
-                  <td style={styles.td}>
-                    <code style={styles.code}>{p.mpesa_ref}</code>
-                  </td>
-                  <td style={styles.td}>
-                    <StatusBadge status={p.status} />
-                  </td>
-                  <td style={styles.td}>
-                    {p.resolved ? (
-                      <span
-                        style={{
-                          color: "#8FB87A",
-                          fontSize: "11px",
-                          fontWeight: "700",
-                          letterSpacing: "0.04em",
-                        }}
-                      >
+                        )}
+                      </div>
+                    </td>
+                    <td style={styles.td}>
+                      <code style={styles.code}>{p.mpesa_ref}</code>
+                    </td>
+                    <td style={styles.td}>
+                      <StatusBadge status={p.status} />
+                    </td>
+                    <td style={styles.td}>
+                      {p.resolved ? (
+                          <span
+                              style={{
+                                color: "#8FB87A",
+                                fontSize: "11px",
+                                fontWeight: "700",
+                                letterSpacing: "0.04em",
+                              }}
+                          >
                         RESOLVED
                       </span>
-                    ) : (
-                      <span
-                        style={{
-                          color: "#4A3C28",
-                          fontSize: "11px",
-                          fontWeight: "700",
-                          letterSpacing: "0.04em",
-                        }}
-                      >
+                      ) : (
+                          <span
+                              style={{
+                                color: "#4A3C28",
+                                fontSize: "11px",
+                                fontWeight: "700",
+                                letterSpacing: "0.04em",
+                              }}
+                          >
                         PENDING
                       </span>
-                    )}
-                  </td>
-                  <td style={{ ...styles.td, textAlign: "right" }}>
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: "8px",
-                        justifyContent: "flex-end",
-                      }}
-                    >
-                      {!p.resolved && p.status !== "matched" && (
-                        <button
-                          style={styles.resolveBtn}
-                          onClick={() => handleResolve(p.id)}
-                          disabled={resolving === p.id}
-                        >
-                          {resolving === p.id ? "..." : "Resolve"}
-                        </button>
                       )}
-                      <button
-                        style={styles.smsBtn}
-                        onClick={() => setSmsPhone(p.phone_number)}
+                    </td>
+                    <td style={{ ...styles.td, textAlign: "right" }}>
+                      <div
+                          style={{
+                            display: "flex",
+                            gap: "8px",
+                            justifyContent: "flex-end",
+                          }}
                       >
-                        <IconSms />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                        {!p.resolved && p.status !== "matched" && (
+                            <button
+                                style={styles.resolveBtn}
+                                onClick={() => handleResolve(p.id)}
+                                disabled={resolving === p.id}
+                            >
+                              {resolving === p.id ? "..." : "Resolve"}
+                            </button>
+                        )}
+                        <button
+                            style={styles.smsBtn}
+                            onClick={() => setSmsPhone(p.phone_number)}
+                        >
+                          <IconSms />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
               ))}
               {!loading && payments.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={6}
-                    style={{
-                      ...styles.td,
-                      textAlign: "center",
-                      color: "#4A3C28",
-                      padding: "40px",
-                    }}
-                  >
-                    No payments found.
-                  </td>
-                </tr>
+                  <tr>
+                    <td
+                        colSpan={6}
+                        style={{
+                          ...styles.td,
+                          textAlign: "center",
+                          color: "#4A3C28",
+                          padding: "40px",
+                        }}
+                    >
+                      No payments found.
+                    </td>
+                  </tr>
               )}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
 
-          {/* Pagination */}
-          <div style={paginationContainer}>
-            <div style={paginationControls}>
-              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} style={paginationButton}>
-                <ChevronLeft size={16} /> Prev
-              </button>
-              {getPageNumbers().map((item, idx) =>
-                item === "..." ? (
-                  <span key={`ellipsis-${idx}`} style={paginationEllipsis}>…</span>
-                ) : (
-                  <button
-                    key={item}
-                    onClick={() => setPage(item)}
-                    style={{
-                      ...paginationButton,
-                      background: page === item ? "#B3945B" : "transparent",
-                      color: page === item ? "#1A1A1A" : "#B3945B",
-                      borderColor: "#B3945B",
-                    }}
-                  >
-                    {item}
-                  </button>
-                )
-              )}
-              <button onClick={() => setPage((p) => Math.min(pagesState, p + 1))} disabled={page === pagesState} style={paginationButton}>
-                Next <ChevronRight size={16} />
-              </button>
-            </div>
+            {/* Pagination */}
+            <div style={paginationContainer}>
+              <div style={paginationControls}>
+                <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} style={paginationButton}>
+                  <ChevronLeft size={16} /> Prev
+                </button>
+                {getPageNumbers().map((item, idx) =>
+                    item === "..." ? (
+                        <span key={`ellipsis-${idx}`} style={paginationEllipsis}>…</span>
+                    ) : (
+                        <button
+                            key={item}
+                            onClick={() => setPage(item)}
+                            style={{
+                              ...paginationButton,
+                              background: page === item ? GOLD : "transparent",
+                              color: page === item ? BG_DARK : GOLD,
+                              borderColor: GOLD,
+                            }}
+                        >
+                          {item}
+                        </button>
+                    )
+                )}
+                <button onClick={() => setPage((p) => Math.min(pagesState, p + 1))} disabled={page === pagesState} style={paginationButton}>
+                  Next <ChevronRight size={16} />
+                </button>
+              </div>
 
-            <div style={paginationSide}>
-              <select value={limit} onChange={(e) => setLimit(Number(e.target.value))} style={limitSelect}>
-                {[10, 15, 20, 50, 100].map((num) => <option key={num} value={num}>{num} / page</option>)}
-              </select>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <span style={{ fontSize: "12px", color: "#A3A3A3" }}>Go to</span>
-                <input
-                  type="number"
-                  min="1"
-                  max={pagesState}
-                  value={gotoPage}
-                  onChange={(e) => setGotoPage(e.target.value)}
-                  onKeyPress={(e) => e.key === "Enter" && handleGoToPage()}
-                  style={gotoInput}
-                />
-                <button onClick={handleGoToPage} style={gotoButton}>Page</button>
+              <div style={paginationSide}>
+                <div style={{ width: "120px" }}>
+                  <ScrollableSelect
+                      value={String(limit)}
+                      onChange={(val) => setLimit(Number(val))}
+                      placeholder={`${limit} / page`}
+                      options={[10, 15, 20, 50, 100, 250, 500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000, 9500, 10000].map((num) => ({ value: String(num), label: `${num} / page` }))}
+                  />
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontSize: "12px", color: TEXT_SECONDARY }}>Go to</span>
+                  <input
+                      type="number"
+                      min="1"
+                      max={pagesState}
+                      value={gotoPage}
+                      onChange={(e) => setGotoPage(e.target.value)}
+                      onKeyPress={(e) => e.key === "Enter" && handleGoToPage()}
+                      style={gotoInput}
+                  />
+                  <button onClick={handleGoToPage} style={gotoButton}>Page</button>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {smsPhone && (
-        <SendSmsModal
-          defaultPhone={smsPhone}
-          onClose={() => setSmsPhone(null)}
-          onSend={() => setSmsPhone(null)}
-        />
-      )}
-    </div>
+        {smsPhone && (
+            <SendSmsModal
+                defaultPhone={smsPhone}
+                onClose={() => setSmsPhone(null)}
+                onSend={() => setSmsPhone(null)}
+                onSuccess={(msg) => showToast(msg, "success")}
+            />
+        )}
+
+        {/* Scroll to Top Button */}
+        {showScrollTop && (
+            <button
+                onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+                style={{
+                  position: "fixed",
+                  bottom: "30px",
+                  right: "30px",
+                  width: "44px",
+                  height: "44px",
+                  borderRadius: "50%",
+                  background: GOLD,
+                  color: BG_DARK,
+                  border: "none",
+                  cursor: "pointer",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 1000,
+                  transition: "opacity 0.2s",
+                }}
+                title="Scroll to top"
+            >
+              <ChevronUp size={24} />
+            </button>
+        )}
+      </div>
   );
 }
 
@@ -622,7 +728,6 @@ const styles = {
     fontFamily: "monospace",
     border: "1px solid #3A3020",
   },
-  // excessBadge removed – now inlined green style
   resolveBtn: {
     background: "#B3945B",
     color: "#0E0C08",
@@ -685,7 +790,7 @@ const paginationControls = {
 
 const paginationButton = {
   padding: "6px 12px",
-  border: "1px solid #B3945B",        // solid gold border
+  border: "1px solid #B3945B",
   borderRadius: "6px",
   background: "transparent",
   color: "#B3945B",

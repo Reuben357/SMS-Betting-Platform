@@ -1,11 +1,13 @@
 "use client";
-import { useUser } from "@auth0/nextjs-auth0/client";
+import { useUser } from "@auth0/nextjs-auth0";
 
 const BG_DARK = "#1A1A1A";
 const GOLD = "#B3945B";
+const TEXT_PRIMARY = "#FFFFFF"; // main text
+
 
 export default function TopBar({ title }) {
-  const { user } = useUser();
+    const { user } = useUser({ route: "/api/auth/me" });
 
   return (
     <header
@@ -23,7 +25,7 @@ export default function TopBar({ title }) {
         style={{
           fontWeight: 700,
           fontSize: "18px",
-          color: GOLD,
+          color: TEXT_PRIMARY,
           letterSpacing: "-0.02em",
         }}
       >

@@ -1,0 +1,1 @@
+ALTER TABLE contacts ADD COLUMN jackpot_frequency INTEGER DEFAULT 0;

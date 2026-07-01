@@ -200,10 +200,82 @@ async function updateTiers(req, res) {
   }
 }
 
+// JP Customers
+async function getJpPotentialTiers(req, res) {
+  try {
+    const result = await pool.query(
+        `SELECT * FROM tiers_jp_potential ORDER BY tier_number ASC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    logger.error("getJpPotentialTiers error:", err.message);
+    res.status(500).json({ error: "Failed to fetch JP tier configuration." });
+  }
+}
+
+async function updateJpPotentialTiers(req, res) {
+  const { tiers } = req.body; // array of { id, tier_number, min_jp_frequency, max_jp_frequency }
+  if (!Array.isArray(tiers)) {
+    return res.status(400).json({ error: "Invalid data format." });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    for (const tier of tiers) {
+      if (tier.min_jp_frequency >= tier.max_jp_frequency) {
+        throw new Error(`Tier ${tier.tier_number}: min must be less than max.`);
+      }
+      await client.query(
+          `UPDATE tiers_jp_potential
+         SET min_jp_frequency = $1, max_jp_frequency = $2
+         WHERE id = $3`,
+          [tier.min_jp_frequency, tier.max_jp_frequency, tier.id]
+      );
+    }
+    await client.query("COMMIT");
+    res.json({ message: "JP tier configuration updated." });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    logger.error(`updateJpPotentialTiers error: ${err.message}`);
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+}
+
+async function createJpPotentialTier(req, res) {
+  const { tier_number, min_jp_frequency, max_jp_frequency } = req.body;
+  if (!tier_number || min_jp_frequency == null || max_jp_frequency == null) {
+    return res.status(400).json({ error: "All fields required." });
+  }
+  if (min_jp_frequency >= max_jp_frequency) {
+    return res.status(400).json({ error: "min must be less than max." });
+  }
+  try {
+    const result = await pool.query(
+        `INSERT INTO tiers_jp_potential (tier_number, min_jp_frequency, max_jp_frequency)
+       VALUES ($1, $2, $3)
+       RETURNING *`,
+        [tier_number, min_jp_frequency, max_jp_frequency]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    if (err.code === "23505") {
+      return res.status(409).json({ error: "Tier number already exists." });
+    }
+    logger.error("createJpPotentialTier error:", err.message);
+    res.status(500).json({ error: "Failed to create JP tier." });
+  }
+}
+
 module.exports = {
   getTiers,
   updateTiers,
   createActiveTier,
   createActiveSubTier,
   createPotentialTier,
+  getJpPotentialTiers,
+  updateJpPotentialTiers,
+  createJpPotentialTier,
 };

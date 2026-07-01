@@ -5,6 +5,7 @@ const { normalisePhone } = require("../services/csvService");
 const { logger } = require("../middleware/errorHandler");
 const redis = require("../config/redis");
 const { sendSMS } = require("../services/smsService");
+const { sendTipsDelivery } = require('../services/smsService');
 const { updateActiveTier } = require("../services/tierService");
 
 /**
@@ -18,9 +19,17 @@ async function mpesaCallback(req, res) {
   logger.info(`M-Pesa callback received: ${JSON.stringify(callbackData)}`);
 
   try {
-    const mpesaRef = callbackData.TransID;
-    const rawPhone = callbackData.MSISDN;
-    const rawAmount = callbackData.TransAmount;
+   const mpesaRef =
+  callbackData.TransID ||
+  callbackData.transactionId;
+
+const rawPhone =
+  callbackData.MSISDN ||
+  callbackData.msisdn;
+
+const rawAmount =
+  callbackData.TransAmount ||
+  callbackData.amount;
 
     // Validate required fields
     if (!mpesaRef || !rawPhone || !rawAmount) {
@@ -131,7 +140,7 @@ async function mpesaValidation(req, res) {
  * Supports pagination and filtering by status and resolved flag.
  */
 async function getPayments(req, res) {
-  const { status, resolved, page = 1, limit = 50 } = req.query;
+  const { status, resolved, phone, page = 1, limit = 50 } = req.query;
   const offset = (parseInt(page) - 1) * parseInt(limit);
 
   try {
@@ -147,6 +156,10 @@ async function getPayments(req, res) {
       conditions.push(`p.resolved = $${i++}`);
       params.push(resolved === "true");
     }
+    if (phone) {
+      conditions.push(`p.phone_number ILIKE $${i++}`);
+      params.push(`%${phone}%`);
+    }
 
     const where =
       conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
@@ -158,22 +171,34 @@ async function getPayments(req, res) {
     const total = parseInt(countResult.rows[0].count);
 
     const result = await pool.query(
-      `SELECT
-         p.id,
-         p.mpesa_ref,
-         p.phone_number,
-         p.amount,
-         p.status,
-         p.excess_amount,
-         p.resolved,
-         p.created_at,
-         pkg.name AS package_name
-       FROM payments p
-       LEFT JOIN packages pkg ON pkg.id = p.matched_package_id
-       ${where}
-       ORDER BY p.created_at DESC
-       LIMIT $${i} OFFSET $${i + 1}`,
-      [...params, parseInt(limit), offset],
+        `SELECT
+           p.id,
+           p.mpesa_ref,
+           p.phone_number,
+           p.amount,
+           p.status,
+           p.excess_amount,
+           p.resolved,
+           p.created_at,
+           CASE
+             WHEN pkg.name IS NOT NULL THEN pkg.name
+             WHEN EXISTS (
+               SELECT 1 FROM purchases pu
+               WHERE pu.payment_id = p.id AND pu.is_subscription = true
+             ) THEN 'Jackpot Subscription'
+             ELSE NULL
+             END AS package_name,
+           -- Also add a flag to identify subscription payments
+           EXISTS (
+             SELECT 1 FROM purchases pu
+             WHERE pu.payment_id = p.id AND pu.is_subscription = true
+           ) AS is_subscription
+         FROM payments p
+                LEFT JOIN packages pkg ON pkg.id = p.matched_package_id
+           ${where}
+         ORDER BY p.created_at DESC
+           LIMIT $${i} OFFSET $${i + 1}`,
+        [...params, parseInt(limit), offset],
     );
 
     res.json({
@@ -226,10 +251,9 @@ async function resolvePayment(req, res) {
     }
 
     const { phone_number, amount, status: paymentStatus } = payment;
-    // CHANGED: use a mutable variable for the resolved package id
     let resolvedPackageId = payment.matched_package_id;
 
-    // ---- NEW: Try to match by amount if no package linked yet ----
+    // Try to match by amount if no package linked yet
     if (!resolvedPackageId) {
       const matchAttempt = await client.query(
         `SELECT id, price, game_count FROM packages
@@ -292,11 +316,14 @@ async function resolvePayment(req, res) {
     }
 
     // Create purchase record
-    await client.query(
+    const purchaseResult = await client.query(
       `INSERT INTO purchases (phone_number, package_id, payment_id, amount_paid)
-       VALUES ($1, $2, $3, $4)`,
+       VALUES ($1, $2, $3, $4)
+       RETURNING id`,
       [phone_number, resolvedPackageId, id, amount]   // CHANGED: use resolvedPackageId
     );
+
+    const purchaseId = purchaseResult.rows[0].id;
 
     // Upsert customer
     await client.query(
@@ -308,16 +335,6 @@ async function resolvePayment(req, res) {
            updated_at = NOW()`,
       [phone_number]
     );
-
-    // Update contact spend (only once)
-    await client.query(
-      `UPDATE contacts
-       SET total_received_amount = total_received_amount + $1
-       WHERE phone_number = $2`,
-      [amount, phone_number]
-    );
-
-    // CHANGED: moved updateActiveTier to after commit (non‑critical) – see below
 
     // CHANGED: extended shouldSendTips to cover more statuses
     const NO_TIPS_YET_STATUSES = new Set([
@@ -336,13 +353,14 @@ async function resolvePayment(req, res) {
         [resolvedPackageId]        // CHANGED: use resolvedPackageId
       );
       const tips = tipsRes.rows;
+
       if (tips.length > 0) {
         const tipsText = tips
           .map((t, i) => `${i + 1}. ${t.game_name} - ${t.prediction}`)
           .join("\n");
         setImmediate(async () => {
           try {
-            await sendSMS(phone_number, `Your tips:\n${tipsText}`, "tips_delivery");
+            await sendTipsDelivery(phone_number, tipsText, purchaseId, req.user?.id, 'active_sub_A2');
             logger.info(`Tips sent to ${phone_number} for resolved payment ${id}`);
           } catch (smsErr) {
             logger.error(`Failed to send tips for resolved payment ${id}: ${smsErr.message}`);

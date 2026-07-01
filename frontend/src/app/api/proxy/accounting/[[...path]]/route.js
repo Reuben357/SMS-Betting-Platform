@@ -1,15 +1,32 @@
-import { getAccessToken, withApiAuthRequired } from "@auth0/nextjs-auth0";
+import { connection } from 'next/server';
+import { auth0 } from "@/lib/auth0";
 import { NextResponse } from "next/server";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
-export const GET = withApiAuthRequired(async function GET(req, { params }) {
-  const res = new NextResponse();
-  const { accessToken } = await getAccessToken(req, res);
-  const path = params.path?.join("/") || "";
+export async function GET(req, { params }) {
+  try {
+    const { token: accessToken } = await auth0.getAccessToken();
+    const resolvedParams = await params;
+    const path = resolvedParams.path?.join("/") || "";
 
-  const backendRes = await fetch(`${API_URL}/api/accounting/${path}${new URL(req.url).search}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  return NextResponse.json(await backendRes.json(), { status: backendRes.status });
-});
+    const backendRes = await fetch(
+        `${API_URL}/api/accounting/${path}${new URL(req.url).search}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Cache-Control": "no-store",
+          },
+          cache: "no-store",
+        }
+    );
+    const data = await backendRes.json();
+    return NextResponse.json(data, { status: backendRes.status });
+  } catch (err) {
+    console.error("Accounting proxy error:", err.message);
+    return NextResponse.json(
+        { error: "Failed to fetch accounting data." },
+        { status: 500 }
+    );
+  }
+}

@@ -101,16 +101,27 @@ async function getFlaggedPayments(req, res) {
     const total = parseInt(countRes.rows[0].count);
 
     const result = await pool.query(
-      `SELECT
-         p.id, p.phone_number, p.amount, p.mpesa_ref,
-         p.status, p.excess_amount, p.resolved, p.created_at,
-         pkg.name AS package_name
-       FROM payments p
-       LEFT JOIN packages pkg ON pkg.id = p.matched_package_id
-       ${where}
-       ORDER BY p.created_at DESC
-       LIMIT $${i} OFFSET $${i + 1}`,
-      [...params, limit, offset]
+        `SELECT
+           p.id, p.phone_number, p.amount, p.mpesa_ref,
+           p.status, p.excess_amount, p.resolved, p.created_at,
+           CASE
+             WHEN pkg.name IS NOT NULL THEN pkg.name
+             WHEN EXISTS (
+               SELECT 1 FROM purchases pu
+               WHERE pu.payment_id = p.id AND pu.is_subscription = true
+             ) THEN ' Jackpot Subscription'
+             ELSE NULL
+             END AS package_name,
+           EXISTS (
+             SELECT 1 FROM purchases pu
+             WHERE pu.payment_id = p.id AND pu.is_subscription = true
+           ) AS is_subscription
+         FROM payments p
+                LEFT JOIN packages pkg ON pkg.id = p.matched_package_id
+           ${where}
+         ORDER BY p.created_at DESC
+           LIMIT $${i} OFFSET $${i + 1}`,
+        [...params, limit, offset]
     );
 
     res.json({
@@ -129,27 +140,82 @@ async function getFlaggedPayments(req, res) {
  * GET /api/accounting/purchases
  * Paginated list of all purchases with package name and M‑Pesa reference.
  */
+// accountingController.js
+
 async function getPurchaseHistory(req, res) {
   const page = Math.max(1, parseInt(req.query.page) || 1);
   const limit = Math.min(100, parseInt(req.query.limit) || 50);
   const offset = (page - 1) * limit;
 
+  // --- Read filter parameters ---
+  const { phone, dateFrom, dateTo, packageType } = req.query;
+
+  // --- Build dynamic WHERE clauses ---
+  const conditions = [];
+  const params = [];
+  let paramIndex = 1;
+
+  // Phone number filter (partial match)
+  if (phone && phone.trim()) {
+    conditions.push(`pu.phone_number ILIKE $${paramIndex++}`);
+    params.push(`%${phone.trim()}%`);
+  }
+
+  // Date range filters
+  if (dateFrom) {
+    conditions.push(`pu.created_at >= $${paramIndex++}`);
+    params.push(dateFrom);
+  }
+  if (dateTo) {
+    conditions.push(`pu.created_at <= $${paramIndex++}`);
+    params.push(dateTo);
+  }
+
+  // Package type filter
+  if (packageType && packageType !== 'all') {
+    if (packageType === 'jackpot') {
+      conditions.push(`pu.is_subscription = true`);
+    } else if (packageType === 'normal') {
+      conditions.push(`pu.is_subscription = false`);
+    }
+  }
+
+  const whereClause = conditions.length > 0
+      ? `WHERE ${conditions.join(' AND ')}`
+      : '';
+
   try {
-    const countRes = await pool.query(`SELECT COUNT(*) FROM purchases`);
+    // --- Count query with filters ---
+    const countQuery = `
+      SELECT COUNT(*) 
+      FROM purchases pu
+      ${whereClause}
+    `;
+    const countRes = await pool.query(countQuery, params);
     const total = parseInt(countRes.rows[0].count);
 
-    const result = await pool.query(
-      `SELECT
-         pu.id, pu.phone_number, pu.amount_paid, pu.created_at,
-         pkg.name AS package_name,
-         pay.mpesa_ref
-       FROM purchases pu
-       LEFT JOIN packages pkg ON pkg.id = pu.package_id
-       LEFT JOIN payments pay ON pay.id = pu.payment_id
-       ORDER BY pu.created_at DESC
-       LIMIT $1 OFFSET $2`,
-      [limit, offset]
-    );
+    // --- Data query with filters and pagination ---
+    const dataQuery = `
+      SELECT
+        pu.id,
+        pu.phone_number,
+        pu.amount_paid,
+        pu.created_at,
+        pu.is_subscription,
+        CASE
+          WHEN pu.is_subscription = true THEN 'Jackpot Subscription'
+          ELSE pkg.name
+        END AS package_name,
+        pay.mpesa_ref
+      FROM purchases pu
+      LEFT JOIN packages pkg ON pkg.id = pu.package_id
+      LEFT JOIN payments pay ON pay.id = pu.payment_id
+      ${whereClause}
+      ORDER BY pu.created_at DESC
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `;
+    const dataParams = [...params, limit, offset];
+    const result = await pool.query(dataQuery, dataParams);
 
     res.json({
       purchases: result.rows,
@@ -159,7 +225,7 @@ async function getPurchaseHistory(req, res) {
     });
   } catch (err) {
     logger.error(`getPurchaseHistory error: ${err.message}`);
-    res.status(500).json({ error: "Failed to fetch purchase history." });
+    res.status(500).json({ error: 'Failed to fetch purchase history.' });
   }
 }
 

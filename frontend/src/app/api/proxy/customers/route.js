@@ -1,14 +1,19 @@
-import { getAccessToken } from "@auth0/nextjs-auth0";
+import { auth0 } from "@/lib/auth0";
 import { NextResponse } from "next/server";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export async function GET(req) {
   try {
-    const res = new NextResponse();
-    const { accessToken } = await getAccessToken(req, res);
+    //
+    const { token: accessToken } = await auth0.getAccessToken();
 
-    const backendRes = await fetch(`${API_URL}/api/customers/with-tiers`, {
+    const { searchParams } = new URL(req.url);
+    const page = searchParams.get("page") || "1";
+    const limit = searchParams.get("limit") || "20";
+    const search = searchParams.get("search") || "";
+
+    const backendRes = await fetch(`${API_URL}/api/customers?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`,{
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },

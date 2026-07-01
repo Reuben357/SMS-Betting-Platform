@@ -2,10 +2,12 @@
 // For production with multiple workers, replace the Map with a Redis store.
 const { logger } = require("./errorHandler");
 
+
 function rateLimit({
   windowMs = 60_000,
   max = 60,
   message = "Too many requests. Please slow down.",
+  skipPaths = [],
 } = {}) {
   const store = new Map();
 
@@ -19,6 +21,11 @@ function rateLimit({
   cleanupInterval.unref(); // does not keep Node process alive
 
   return function rateLimitMiddleware(req, res, next) {
+    // Skip rate limiting for certain paths
+    if (skipPaths.includes(req.path)) {
+      return next();
+    }
+
     // Get real IP behind proxies (Cloudflare, Nginx, etc.)
     const ip =
       req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
@@ -45,7 +52,12 @@ function rateLimit({
 }
 
 // Pre‑built limiters
-const standardLimiter = rateLimit({ windowMs: 60_000, max: 120 });
+const standardLimiter = rateLimit({
+   windowMs: 60_000,
+    max: 120,
+    skipPaths: ['/api/uploads/csv'],
+  });
+
 const mpesaLimiter = rateLimit({
   windowMs: 60_000,
   max: 30,
@@ -62,10 +74,18 @@ const authLimiter = rateLimit({
   message: "Too many authentication attempts. Please wait before trying again.",
 });
 
+//Upload Limiter with a much higher limit, since uploads can be larger and less frequent
+const uploadLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 1000,
+  message: "Upload rate limit exceeded.",
+});
+
 module.exports = {
   rateLimit,
   standardLimiter,
   mpesaLimiter,
+  uploadLimiter,
   smsLimiter,
   authLimiter,
 };
