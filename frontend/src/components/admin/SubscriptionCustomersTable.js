@@ -42,6 +42,9 @@ export default function SubscriptionCustomersTable() {
     // Total amount collected from subscriptions
     const [totalAmount, setTotalAmount] = useState(0);
 
+    // Total number of unique subscribers
+    const [totalSubscribers, setTotalSubscribers] = useState(0);
+
     const fetchCustomers = useCallback(async () => {
         setLoading(true);
         try {
@@ -53,6 +56,9 @@ export default function SubscriptionCustomersTable() {
             // Compute total amount
             const total = customersData.reduce((sum, c) => sum + (c.total_subscription_amount || 0), 0);
             setTotalAmount(total);
+
+            // Compute total subscribers (unique phone numbers)
+            setTotalSubscribers(customersData.length);
         } catch (err) {
             console.error(err);
         } finally {
@@ -119,7 +125,7 @@ export default function SubscriptionCustomersTable() {
                 overflow: "hidden",
             }}
         >
-            {/* ===== NEW: Total Amount Card ===== */}
+            {/* ===== Header Cards: Revenue + Subscribers ===== */}
             <div
                 style={{
                     padding: "20px 24px",
@@ -128,8 +134,10 @@ export default function SubscriptionCustomersTable() {
                     alignItems: "center",
                     gap: "16px",
                     background: BG_DARK,
+                    flexWrap: "wrap",
                 }}
             >
+                {/* Revenue Card */}
                 <div
                     style={{
                         background: `${GOLD}10`,
@@ -141,16 +149,37 @@ export default function SubscriptionCustomersTable() {
                         gap: "2px",
                     }}
                 >
-          <span style={{ fontSize: "11px", fontWeight: 700, color: TEXT_SECONDARY, textTransform: "uppercase" }}>
-            Total Subscription Revenue
-          </span>
+                    <span style={{ fontSize: "11px", fontWeight: 700, color: TEXT_SECONDARY, textTransform: "uppercase" }}>
+                        Total Subscription Revenue
+                    </span>
                     <span style={{ fontSize: "24px", fontWeight: 800, color: SUCCESS }}>
-            KES {loading ? "…" : totalAmount.toLocaleString()}
-          </span>
+                        KES {loading ? "?" : totalAmount.toLocaleString()}
+                    </span>
                 </div>
+
+                {/* Subscribers Card */}
+                <div
+                    style={{
+                        background: `${GOLD}10`,
+                        border: `1px solid ${GOLD}33`,
+                        borderRadius: "12px",
+                        padding: "12px 20px",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "2px",
+                    }}
+                >
+                    <span style={{ fontSize: "11px", fontWeight: 700, color: TEXT_SECONDARY, textTransform: "uppercase" }}>
+                        Total Subscribers
+                    </span>
+                    <span style={{ fontSize: "24px", fontWeight: 800, color: TEXT_PRIMARY }}>
+                        {loading ? "?" : totalSubscribers.toLocaleString()}
+                    </span>
+                </div>
+
                 <span style={{ fontSize: "12px", color: TEXT_SECONDARY }}>
-          Combined total from all subscription customers
-        </span>
+                    {totalSubscribers} unique customers with at least one subscription
+                </span>
             </div>
 
             {/* Action Bar: Search + Obfuscate + Export */}
@@ -312,7 +341,7 @@ export default function SubscriptionCustomersTable() {
                         </button>
                         {pageNumbers.map((item, idx) =>
                             item === "..." ? (
-                                <span key={`ellipsis-${idx}`} style={{ padding: "6px 8px", color: TEXT_SECONDARY }}>…</span>
+                                <span key={`ellipsis-${idx}`} style={{ padding: "6px 8px", color: TEXT_SECONDARY }}>?</span>
                             ) : (
                                 <button
                                     key={item}
