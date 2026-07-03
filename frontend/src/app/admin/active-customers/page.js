@@ -1,7 +1,7 @@
 "use client";
 import {useState, useEffect, useCallback} from "react";
 import TopBar from "@/components/TopBar";
-import {Users, TrendingUp, Search, AlertTriangle, ChevronLeft, ChevronRight} from "lucide-react";
+import {Users, TrendingUp, Search, AlertTriangle, ChevronLeft, ChevronRight, ChevronUp} from "lucide-react";
 import {exportToCSV} from "@/lib/exportService";
 import {exportToPDF} from "@/lib/pdfExport";
 import ScrollableSelect from "@/components/ui/ScrollableSelect";
@@ -184,6 +184,9 @@ export default function ActiveCustomersPage() {
     const [totalPages, setTotalPages] = useState(1);
     const [gotoPage, setGotoPage] = useState("");
 
+    // Scroll-to-top state
+    const [showScrollTop, setShowScrollTop] = useState(false);
+
     // Helper: page numbers with ellipsis
     const getPageNumbers = () => {
         const total = totalPages;
@@ -303,6 +306,19 @@ export default function ActiveCustomersPage() {
     useEffect(() => {
         setPage(1);
     }, [limit, searchTerm]);
+
+    // Scroll listener for scroll-to-top
+    useEffect(() => {
+        const handleScroll = () => {
+            setShowScrollTop(window.scrollY > 300);
+        };
+        window.addEventListener("scroll", handleScroll);
+        return () => window.removeEventListener("scroll", handleScroll);
+    }, []);
+
+    const scrollToTop = () => {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    };
 
     if (error) {
         return (
@@ -710,6 +726,32 @@ export default function ActiveCustomersPage() {
                     </div>
                 )}
             </div>
+
+            {/* Scroll-to-top button */}
+            {showScrollTop && (
+                <button
+                    onClick={scrollToTop}
+                    style={{
+                        position: "fixed",
+                        bottom: "30px",
+                        right: "30px",
+                        width: "44px",
+                        height: "44px",
+                        borderRadius: "50%",
+                        background: GOLD,
+                        color: BG_DARK,
+                        border: "none",
+                        cursor: "pointer",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        zIndex: 1000,
+                    }}
+                >
+                    <ChevronUp size={24} />
+                </button>
+            )}
         </div>
     );
 }

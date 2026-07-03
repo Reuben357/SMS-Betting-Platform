@@ -2,7 +2,7 @@
 
 import {useState, useEffect, useCallback, useRef} from "react";
 import TopBar from "@/components/TopBar";
-import {ChevronLeft, ChevronRight, AlertTriangle, CheckCircle, XCircle, AlertCircle} from "lucide-react";
+import {ChevronLeft, ChevronRight, AlertTriangle, CheckCircle, XCircle, AlertCircle, ChevronUp} from "lucide-react";
 import ScrollableSelect from "@/components/ui/ScrollableSelect";
 
 // Midnight Gold color palette
@@ -1100,6 +1100,21 @@ function HistoryPanel() {
 
 // ---- Main Page ----
 export default function SMSPage() {
+    // Scroll-to-top state and handler
+    const [showScrollTop, setShowScrollTop] = useState(false);
+
+    useEffect(() => {
+        const handleScroll = () => {
+            setShowScrollTop(window.scrollY > 300);
+        };
+        window.addEventListener("scroll", handleScroll);
+        return () => window.removeEventListener("scroll", handleScroll);
+    }, []);
+
+    const scrollToTop = () => {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+
     return (
         <div style={{minHeight: "100vh", backgroundColor: BG_DARK}}>
             <TopBar title="SMS Management"/>
@@ -1108,6 +1123,31 @@ export default function SMSPage() {
                 <SendPanel/>
                 <HistoryPanel/>
             </div>
+            {/* Scroll-to-top button */}
+            {showScrollTop && (
+                <button
+                    onClick={scrollToTop}
+                    style={{
+                        position: "fixed",
+                        bottom: "30px",
+                        right: "30px",
+                        width: "44px",
+                        height: "44px",
+                        borderRadius: "50%",
+                        background: GOLD,
+                        color: BG_DARK,
+                        border: "none",
+                        cursor: "pointer",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        zIndex: 1000,
+                    }}
+                >
+                    <ChevronUp size={24} />
+                </button>
+            )}
         </div>
     );
 }
