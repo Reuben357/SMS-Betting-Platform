@@ -24,14 +24,12 @@ const GOLD_LIGHT = "#D4AF6A"; // lighter gold for hover/gradients
 const DANGER = "#EF4444"; // keep red for flagged
 const SUCCESS = "#10B981"; // green for positive metrics
 
-// Generate a distinct color for any tier number (1‑200+)
-// Uses HSL: different hue per tier, decent saturation, readable lightness
+// Generate a distinct color for any tier number (1–200+)
 function getTierColor(tierNumber) {
-    // Use a golden‑ratio‑based hue spread to keep colors well distributed
-    const hue = (tierNumber * 137.5) % 360; // 137.5 ≈ golden angle
-    const saturation = 55; // moderate saturation, not too flashy
-    const bgLightness = 22; // dark background, similar to card bg
-    const textLightness = 78; // bright text for contrast
+    const hue = (tierNumber * 137.5) % 360;
+    const saturation = 55;
+    const bgLightness = 22;
+    const textLightness = 78;
     const borderLightness = 45;
     return {
         bg: `hsl(${hue}, ${saturation}%, ${bgLightness}%)`,
@@ -107,7 +105,7 @@ function MetricCard({
                         lineHeight: 1,
                     }}
                 >
-                    {loading ? "…" : value || "0"}
+                    {loading ? "?" : value || "0"}
                 </div>
             )}
             {sub && !redacted && (
@@ -134,7 +132,7 @@ function TierList({tiers, loading}) {
                     color: TEXT_SECONDARY,
                 }}
             >
-                Loading tiers…
+                Loading tiers?
             </div>
         );
     }
@@ -153,7 +151,6 @@ function TierList({tiers, loading}) {
             </div>
         );
     }
-    // Sort tiers by tier number (ascending)
     const sorted = [...tiers].sort((a, b) => a.tier - b.tier);
     const total = sorted.reduce((sum, t) => sum + t.value, 0);
     return (
@@ -272,7 +269,6 @@ export default function DashboardPage() {
     const isAdmin = data?.role === "admin";
     const financialTrend = data?.trends || [];
 
-    // Prepare contact tiers for the scrollable list
     const tierData = (data?.contacts?.by_tier || []).map((t) => ({
         tier: parseInt(t.tier),
         value: parseInt(t.count) || 0,
@@ -286,6 +282,7 @@ export default function DashboardPage() {
     const stats = {
         totalContacts: fmt(data?.contacts?.total),
         activeCustomers: fmt(data?.customers?.total),
+        normalPackageCustomers: fmt(data?.customers?.normal_package_customers),
         netProfit: fmt(data?.financials?.net_profit),
         todayRevenue: fmt(data?.payments?.today_revenue),
         totalOutflow: fmt(data?.financials?.total_outflow),
@@ -293,7 +290,6 @@ export default function DashboardPage() {
         paymentsToday: data?.payments?.today_count ?? 0,
         flagged: data?.payments?.flagged_unresolved ?? 0,
     };
-
 
     if (error) {
         return (
@@ -340,10 +336,11 @@ export default function DashboardPage() {
                 }}
             >
                 <SectionLabel>Lead Management</SectionLabel>
+                {/* 👇 Changed grid to 5 columns to accommodate the new card */}
                 <div
                     style={{
                         display: "grid",
-                        gridTemplateColumns: "repeat(4, 1fr)",
+                        gridTemplateColumns: "repeat(5, 1fr)",
                         gap: "20px",
                         marginBottom: "32px",
                     }}
@@ -358,6 +355,13 @@ export default function DashboardPage() {
                         label="Active Customers"
                         value={stats.activeCustomers}
                         sub="Purchasing users"
+                        color={GOLD_LIGHT}
+                        loading={loading}
+                    />
+                    <MetricCard
+                        label="Active Package Customers"
+                        value={stats.normalPackageCustomers}
+                        sub="Package Purchases"
                         color={GOLD_LIGHT}
                         loading={loading}
                     />
@@ -411,8 +415,8 @@ export default function DashboardPage() {
                                 >
                                     <Lock size={28}/>
                                     <span style={{fontSize: "13px", fontWeight: 600}}>
-                    Financial trends are visible to admins only.
-                  </span>
+                                        Financial trends are visible to admins only.
+                                    </span>
                                 </div>
                             ) : financialTrend.length > 0 ? (
                                 <ResponsiveContainer width="100%" height="100%">
@@ -450,16 +454,13 @@ export default function DashboardPage() {
                                                                 fontSize: "12px",
                                                             }}
                                                         >
-                                                            <p style={{
-                                                                margin: "0 0 4px 0",
-                                                                fontWeight: 600
-                                                            }}>{label}</p>
+                                                            <p style={{margin: "0 0 4px 0", fontWeight: 600}}>
+                                                                {label}
+                                                            </p>
                                                             <ul style={{listStyleType: "none", padding: 0, margin: 0}}>
                                                                 {payload.map((item, index) => {
-                                                                    // Force DANGER color specifically for Outflow
                                                                     const isOutflow = item.name === "Outflow";
                                                                     const itemColor = isOutflow ? DANGER : item.color;
-
                                                                     return (
                                                                         <li
                                                                             key={index}
@@ -519,7 +520,7 @@ export default function DashboardPage() {
                                     }}
                                 >
                                     {loading
-                                        ? "Gathering financial data…"
+                                        ? "Gathering financial data?"
                                         : "No trend data for the last 7 days."}
                                 </div>
                             )}
