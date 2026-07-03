@@ -151,21 +151,18 @@ async function deactivatePackage(req, res) {
       return res.status(400).json({ error: "Cannot modify a soft-deleted package." });
     }
 
-    // Deactivate the package
+    // Deactivate the package and set deactivated_at
     const deactivateRes = await client.query(
-        `UPDATE packages SET is_active = false WHERE id = $1 RETURNING id`,
+        `UPDATE packages
+         SET is_active = false, deactivated_at = NOW()
+         WHERE id = $1
+           RETURNING id`,
         [id]
     );
     if (deactivateRes.rows.length === 0) {
       await client.query("ROLLBACK");
       return res.status(404).json({ error: "Package not found." });
     }
-
-    // Optionally, mark pending tips as lost (commented out in original)
-    // await client.query(
-    //   `UPDATE tips SET status = 'lost' WHERE package_id = $1 AND status = 'pending'`,
-    //   [id]
-    // );
 
     await client.query("COMMIT");
     res.json({ message: "Package deactivated successfully" });
@@ -197,7 +194,10 @@ async function reactivatePackage(req, res) {
     }
 
     const result = await pool.query(
-        `UPDATE packages SET is_active = true WHERE id = $1 RETURNING *`,
+        `UPDATE packages
+         SET is_active = true, deactivated_at = NULL
+         WHERE id = $1
+           RETURNING *`,
         [id]
     );
 

@@ -84,11 +84,45 @@ const server = app.listen(PORT, async () => {
   setInterval(recoverStuckPayments, 5 * 60 * 1000);
 });
 
+// Soft-delete packages and their tips that were deactivated > 90 days ago
+const softDeleteOldPackages = async () => {
+    try {
+        const { pool } = require('./config/db');
+        // 1. Soft-delete tips belonging to those packages
+        await pool.query(
+            `UPDATE tips
+       SET deleted_at = NOW()
+       FROM packages p
+       WHERE tips.package_id = p.id
+         AND p.deleted_at IS NULL
+         AND p.is_active = false
+         AND p.deactivated_at < NOW() - INTERVAL '90 days'`
+        );
+        // 2. Soft-delete the packages themselves
+        const result = await pool.query(
+            `UPDATE packages
+       SET deleted_at = NOW()
+       WHERE is_active = false
+         AND deleted_at IS NULL
+         AND deactivated_at < NOW() - INTERVAL '90 days'`
+        );
+        if (result.rowCount > 0) {
+            logger.info(`Soft-deleted ${result.rowCount} old packages (and their tips)`);
+        }
+    } catch (err) {
+        logger.error(`Package soft delete error: ${err.message}`);
+    }
+};
 
+// Run every day at 3 AM (after the messages job at 2 AM)
+setInterval(softDeleteOldPackages, 24 * 60 * 60 * 1000);
+
+
+// Soft Delete Messages
 const softDeleteOldMessages = async () => {
     try {
         const { pool } = require('./config/db');
-        // Delete messages older than 30 days that are already sent
+        // Delete messages older than 90 days that are already sent
         const result = await pool.query(
             `UPDATE messages
        SET deleted_at = NOW()

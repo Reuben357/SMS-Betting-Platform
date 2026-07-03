@@ -135,7 +135,7 @@ async function updateTipOutcome(req, res) {
     );
     const pendingCount = parseInt(pendingRes.rows[0].count);
 
-    let softDeleted = false;
+    let deactivated = false;
     let packageName = null;
 
     if (pendingCount === 0) {
@@ -146,18 +146,13 @@ async function updateTipOutcome(req, res) {
       );
       packageName = pkgNameRes.rows[0]?.name || 'Package';
 
-      // Soft-delete the package
       await client.query(
-        `UPDATE packages SET is_active = false, deleted_at = NOW() WHERE id = $1`,
-        [packageId],
+          `UPDATE packages
+         SET is_active = false, deactivated_at = NOW()
+         WHERE id = $1`,
+          [packageId],
       );
-
-      // Soft-delete all tips belonging to this package
-      await client.query(
-          `UPDATE tips SET deleted_at = NOW() WHERE package_id = $1 AND deleted_at IS NULL`,
-          [packageId]
-      );
-      softDeleted = true;
+      deactivated = true;
       logger.info(`Package ${packageId} deactivated – no pending tips left.`);
     }
 
@@ -165,7 +160,7 @@ async function updateTipOutcome(req, res) {
 
     res.json({
       message: "Tip outcome updated.",
-      softDeleted,
+      deactivated,
       packageName,
     });
   } catch (err) {
