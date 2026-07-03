@@ -1,0 +1,1 @@
+ALTER TABLE packages ADD COLUMN deactivated_at TIMESTAMP WITH TIME ZONE;
