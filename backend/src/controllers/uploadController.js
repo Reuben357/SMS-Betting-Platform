@@ -7,9 +7,7 @@ const path = require('path');
 
 const BATCH_SIZE = 200;
 
-// ----------------------------------------------------------------------
 // Process a batch of contacts (insert new, update existing)
-// ----------------------------------------------------------------------
 async function processBatch(client, batch) {
   // Fetch all existing phone numbers from DB
   const phoneNumbers = batch.map(c => c.phone_number);
@@ -81,26 +79,28 @@ async function filterExistingEvents(client, contacts) {
     return { newContacts: contacts, duplicateCount: 0 };
   }
 
-  const placeholders = contactsWithDate.map((_, i) => `($${i*2+1}, $${i*2+2}::timestamptz)`).join(',');
-  const params = contactsWithDate.flatMap(c => [c.phone_number, c.date_created]);
+  const existingSet = new Set()
+  // Iterate and extract matching occurrences using chunk windows matching standard batches
+  for (let i = 0; i < contactsWithDate.length; i += BATCH_SIZE) {
+    const chunk = contactsWithDate.slice(i, i + BATCH_SIZE);
+    const placeholders = chunk.map((_, idx) => `($${idx * 2 + 1}, $${idx * 2 + 2}::timestamptz)`).join(',');
+    const params = chunk.flatMap(c => [c.phone_number, c.date_created]);
 
-  const res = await client.query(
-      `SELECT phone_number, date_created FROM contact_events
-       WHERE (phone_number, date_created) IN (VALUES ${placeholders})`,
-      params
-  );
+    const res = await client.query(
+        `SELECT phone_number, date_created FROM contact_events
+         WHERE (phone_number, date_created) IN (VALUES ${placeholders})`,
+        params
+    );
 
-  // pg returns date_created as a JS Date object; normalise to the same ISO string
-  // format that csvService produces (second precision, no milliseconds) so the
-  // key comparison with contact.date_created actually matches.
-  const existingSet = new Set(
-      res.rows.map(r => {
-        const iso = (r.date_created instanceof Date)
-            ? r.date_created.toISOString().split('.')[0] + 'Z'
-            : String(r.date_created);
-        return `${r.phone_number}|${iso}`;
-      })
-  );
+    res.rows.forEach(r => {
+      const iso = (r.date_created instanceof Date)
+          ? r.date_created.toISOString().split('.')[0] + 'Z'
+          : String(r.date_created);
+      existingSet.add(`${r.phone_number}|${iso}`);
+    });
+  }
+
+
   const newContacts = [];
   let duplicateCount = 0;
 
@@ -119,34 +119,38 @@ async function filterExistingEvents(client, contacts) {
   return { newContacts, duplicateCount };
 }
 
-// TEMPORARY: record events with upload_id for fact‑checking
-// CHANGED: added uploadId parameter and include it in the INSERT
+// Rebuilt query logic to slice execution updates within parameter count safety caps
 async function recordProcessedEvents(client, contacts, uploadId) {
   if (!contacts || !Array.isArray(contacts)) return 0;
   const contactsWithDate = contacts.filter(c => c && c.date_created);
   if (contactsWithDate.length === 0) return 0;
 
-  // Include is_jackpot in the INSERT (5 placeholders)
-  const values = contactsWithDate
-      .map((_, i) => `($${i*5+1}, $${i*5+2}::timestamptz, $${i*5+3}, $${i*5+4}, $${i*5+5})`)
-      .join(',');
-  const params = contactsWithDate.flatMap(c => [
-    c.phone_number,
-    c.date_created,
-    c.received_amount ?? 0,
-    uploadId,
-    c.is_jackpot || false
-  ]);
+  let totalInserted = 0;
 
-  const result = await client.query(
-      `INSERT INTO contact_events (phone_number, date_created, amount, upload_id, is_jackpot_event)
-       VALUES ${values}
-         ON CONFLICT (phone_number, date_created) DO NOTHING`,
-      params
-  );
-  return result.rowCount;
+  for (let i = 0; i < contactsWithDate.length; i += BATCH_SIZE) {
+    const chunk = contactsWithDate.slice(i, i + BATCH_SIZE);
+    const values = chunk
+        .map((_, idx) => `($${idx * 5 + 1}, $${idx * 5 + 2}::timestamptz, $${idx * 5 + 3}, $${idx * 5 + 4}, $${idx * 5 + 5})`)
+        .join(',');
+    const params = chunk.flatMap(c => [
+      c.phone_number,
+      c.date_created,
+      c.received_amount ?? 0,
+      uploadId,
+      c.is_jackpot || false
+    ]);
+
+    const result = await client.query(
+        `INSERT INTO contact_events (phone_number, date_created, amount, upload_id, is_jackpot_event)
+         VALUES ${values}
+           ON CONFLICT (phone_number, date_created) DO NOTHING`,
+        params
+    );
+    totalInserted += result.rowCount;
+  }
+
+  return totalInserted;
 }
-
 
 // Detect file type and parse accordingly
 function getParserForFile(filename) {
@@ -156,7 +160,6 @@ function getParserForFile(filename) {
   if (ext === '.json') return parseJSON;
   return null;
 }
-
 
 // Main upload handler
 async function uploadCSV(req, res) {
@@ -229,7 +232,6 @@ async function uploadCSV(req, res) {
         [filename, uploadedBy, rows.length, 0, 0,
           rowErrors.length, rowErrors.length > 0 ? JSON.stringify(rowErrors) : null, rawFilePath]
     );
-    // TEMPORARY: store uploadId to pass to recordProcessedEvents
     const uploadId = uploadLog.rows[0].id;
 
     // 3. Process contacts in batches (only those that are truly new)
