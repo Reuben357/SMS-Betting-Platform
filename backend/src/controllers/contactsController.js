@@ -1,4 +1,5 @@
 const { pool } = require("../config/db");
+const { logger } = require('../middleware/errorHandler');
 
 /**
  * GET /api/contacts/jackpot
@@ -68,7 +69,10 @@ async function getJackpotContacts(req, res) {
       pages: Math.ceil(total / limit),
     });
   } catch (err) {
-    console.error("getJackpotContacts error:", err.message);
+    logger.error("getJackpotContacts error:", {
+      message: err.message,
+      stack: err.stack,
+    });
     res.status(500).json({ error: "Failed to fetch jackpot customers." });
   }
 }
@@ -120,7 +124,10 @@ async function getContacts(req, res) {
       pages: Math.ceil(total / limit),
     });
   } catch (err) {
-    console.error("getContacts error:", err.message);
+    logger.error("getContacts error:", {
+      message: err.message,
+      stack: err.stack,
+    });
     res.status(500).json({ error: "Failed to fetch contacts." });
   }
 }
@@ -171,7 +178,10 @@ async function getUploadHistory(req, res) {
       totalErrors: parseInt(totals.total_errors),
     });
   } catch (err) {
-    console.error("getUploadHistory error:", err.message);
+    logger.error("getUploadHistory error:", {
+      message: err.message,
+      stack: err.stack,
+    });
     res.status(500).json({ error: "Failed to fetch upload history." });
   }
 }
@@ -226,7 +236,10 @@ async function getLeadStats(req, res) {
       untiered_contacts: parseInt(untieredRes.rows[0].count),
     });
   } catch (err) {
-    console.error("getLeadStats error:", err.message);
+    logger.error("getLeadStats error:", {
+      message: err.message,
+      stack: err.stack,
+    });
     res.status(500).json({ error: "Failed to fetch lead stats." });
   }
 }
