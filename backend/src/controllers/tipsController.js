@@ -167,7 +167,7 @@ async function updateTipOutcome(req, res) {
     await client.query("ROLLBACK");
     logger.error(`updateTipOutcome error: ${err.message}`);
     res.status(500).json({ error: "Failed to update tip." });
-  } finally {cd
+  } finally {
     client.release();
   }
 
