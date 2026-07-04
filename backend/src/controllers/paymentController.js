@@ -8,9 +8,14 @@ const { sendSMS } = require("../services/smsService");
 const { sendTipsDelivery } = require('../services/smsService');
 const { updateActiveTier } = require("../services/tierService");
 
+// Boundary constants to protect the system from out-of-bounds payment values
+const MIN_PACKAGE_PRICE = 1;        // Minimum system package price
+const MAX_REASONABLE_AMOUNT = 250000; // Sane transaction cap threshold
+
 /**
  * Handle M-Pesa C2B (Buy Goods) callback.
- * - Validates and inserts payment with status 'processing'.
+ * - Validates inputs and structural properties.
+ * - Applies strict financial sanity limits.
  * - Responds immediately to Safaricom.
  * - Acquires Redis lock and processes payment asynchronously.
  */
@@ -19,17 +24,9 @@ async function mpesaCallback(req, res) {
   logger.info(`M-Pesa callback received: ${JSON.stringify(callbackData)}`);
 
   try {
-   const mpesaRef =
-  callbackData.TransID ||
-  callbackData.transactionId;
-
-const rawPhone =
-  callbackData.MSISDN ||
-  callbackData.msisdn;
-
-const rawAmount =
-  callbackData.TransAmount ||
-  callbackData.amount;
+   const mpesaRef = callbackData.TransID || callbackData.transactionId;
+   const rawPhone = callbackData.MSISDN || callbackData.msisdn;
+   const rawAmount = callbackData.TransAmount || callbackData.amount;
 
     // Validate required fields
     if (!mpesaRef || !rawPhone || !rawAmount) {
@@ -50,6 +47,12 @@ const rawAmount =
       logger.error(`M-Pesa callback — invalid amount: ${rawAmount}`);
       return res.status(200).json({ ResultCode: 0, ResultDesc: "Success" });
     }
+
+      // Security boundary validation: Stop outlier numbers or unmapped values
+      if (amount < MIN_PACKAGE_PRICE || amount > MAX_REASONABLE_AMOUNT) {
+          logger.warn(`M-Pesa callback rejected — amount out of business boundaries: ${rawAmount} from source ${req.ip}`);
+          return res.status(200).json({ ResultCode: 0, ResultDesc: "Success" });
+      }
 
     // Insert payment (idempotent via mpesa_ref unique)
     let paymentId;
@@ -161,8 +164,7 @@ async function getPayments(req, res) {
       params.push(`%${phone}%`);
     }
 
-    const where =
-      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
     const countResult = await pool.query(
       `SELECT COUNT(*) FROM payments p ${where}`,

@@ -9,11 +9,12 @@ const {
 const { requireAdmin, validateToken } = require('../middleware/auth');
 const syncUser = require('../middleware/syncUser');
 const { mpesaLimiter } = require('../middleware/rateLimiter');
+const mpesaSourceGuard = require('../middleware/mpesaSourceGuard');
 
 
-// Public endpoint for M-Pesa C2B callbacks (Buy Goods), Safaricom calls this directly
-router.post('/c2b-validation',mpesaValidation);   // validation endpoint (public)
-router.post('/c2b-confirmation', mpesaLimiter ,mpesaCallback);
+// Protect endpoints by appending the secret token validation rule
+router.post('/c2b-validation/:token', mpesaSourceGuard, mpesaValidation);
+router.post('/c2b-confirmation/:token',mpesaSourceGuard,  mpesaLimiter ,mpesaCallback);
 
 
 
