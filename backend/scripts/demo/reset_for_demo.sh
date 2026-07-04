@@ -22,7 +22,7 @@ DB_USER="${DB_USER:-betting_user}"
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-5432}"
 BACKEND_PORT="${BACKEND_PORT:-5000}"
-PGPASSWORD="${XVTPbUW4Z3:-}"   # set in env or will prompt
+PGPASSWORD="${***REMOVED***:-}"   # set in env or will prompt
 
 export PGPASSWORD
 

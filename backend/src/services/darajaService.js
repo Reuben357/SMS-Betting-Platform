@@ -29,8 +29,8 @@ const registerC2BUrls = async () => {
       {
         ShortCode: process.env.MPESA_SHORTCODE,
         ResponseType: "Completed",
-        ConfirmationURL: `${process.env.NEXT_PUBLIC_API_URL}/api/payments/c2b-confirmation`,
-        ValidationURL: `${process.env.NEXT_PUBLIC_API_URL}/api/payments/c2b-validation`,
+        ConfirmationURL: `${process.env.NEXT_PUBLIC_API_URL}/api/payments/c2b-confirmation/${process.env.MPESA_CALLBACK_SECRET_PATH}`,
+        ValidationURL: `${process.env.NEXT_PUBLIC_API_URL}/api/payments/c2b-validation/${process.env.MPESA_CALLBACK_SECRET_PATH}`,
       },
       { headers: { Authorization: `Bearer ${token}` } } 
     );
@@ -40,31 +40,6 @@ const registerC2BUrls = async () => {
     throw error;
   }
 };
-
-// Simulate a C2B payment (for testing)
-// const simulateC2B = async (phoneNumber, amount) => {
-//   const token = await getAccessToken();
-  
-//   try {
-//     const response = await axios.post(
-//       "https://sandbox.safaricom.co.ke/mpesa/c2b/v1/simulate",
-//       {
-//         ShortCode: process.env.MPESA_SHORTCODE, 
-//         CommandID: "CustomerBuyGoodsOnline",
-//         Amount: amount,
-//         Msisdn: phoneNumber,
-//         AccountReference: "TEST",
-//       },
-//       { headers: { Authorization: `Bearer ${token}` } }
-//     );
-//     return response.data;
-//   } catch (error) {
-//     console.error("Simulation failed:", error.response?.data || error.message);
-//     throw error;
-//   }
-// };
-
-// Simulate a C2B payment
 
 const simulateC2B = async (
   phoneNumber, 
