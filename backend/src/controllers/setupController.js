@@ -1,6 +1,7 @@
 const { pool } = require("../config/db");
 const { createAuth0User } = require("../services/auth0ManagementService");
 require("dotenv").config();
+const { logger } = require('../middleware/errorHandler');
 
 async function setupAdmin(req, res) {
   const { name, email, password } = req.body;
@@ -37,7 +38,10 @@ async function setupAdmin(req, res) {
       message: "Admin account created. You can now log in.",
     });
   } catch (err) {
-    console.error("Setup error:", err.message);
+    logger.error("Setup error:", {
+      message: err.message,
+      stack: err.stack,
+    });
 
     if (err.message?.includes("already exists")) {
       return res.status(409).json({
