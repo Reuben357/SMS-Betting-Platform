@@ -1,5 +1,6 @@
 const axios = require("axios");
 require("dotenv").config();
+const { logger } = require('../middleware/errorHandler');
 
 // Get OAuth token
 const getAccessToken = async () => {
@@ -14,7 +15,10 @@ const getAccessToken = async () => {
     );
     return response.data.access_token;
   } catch (error) {
-    console.error("Token generation failed:", error.response?.data || error.message);
+    logger.error("Token generation failed:", {
+      message: error.message,
+      responseData: error.response?.data,
+    });
     throw error;
   }
 };
@@ -36,7 +40,10 @@ const registerC2BUrls = async () => {
     );
     return response.data;
   } catch (error) {
-    console.error("C2B Registration failed:", error.response?.data || error.message);
+    logger.error("C2B Registration failed:", {
+      message: error.message,
+      responseData: error.response?.data,
+    });
     throw error;
   }
 };
@@ -72,7 +79,10 @@ const simulateC2B = async (
     );
     return response.data;
   } catch (error) {
-    console.error("Simulation failed:", error.response?.data || error.message);
+    error.error("Simulation failed:", {
+      message: error.message,
+      responseData: error.response?.data,
+    });
     throw error;
   }
 };
