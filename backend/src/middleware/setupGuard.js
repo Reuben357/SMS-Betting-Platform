@@ -1,4 +1,5 @@
 const { pool } = require('../config/db');
+const { logger } = require('./errorHandler');
 
 
 // Blocks the setup route if an admin already exists in the system
@@ -16,7 +17,10 @@ async function setupGuard(req, res, next) {
 
     next();
   } catch (err) {
-    console.error('Setup guard error:', err.message);
+    logger.error('Setup guard error:', {
+      message: err.message,
+      stack: err.stack,
+    });
     res.status(500).json({ error: 'Setup check failed.' });
   }
 }
