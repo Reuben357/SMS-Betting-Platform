@@ -13,7 +13,6 @@ const { gracefulShutdown } = require('./config/db');
 const packageRoutes = require('./routes/packages');
 const tierRoutes = require('./routes/tiers');
 const tipsRoutes = require("./routes/tips");
-// const sessionRoutes = require('./routes/sessions');
 const paymentRoutes = require("./routes/payments");
 const purchaseRoutes = require("./routes/purchases");
 const smsRoutes = require("./routes/sms");
@@ -24,13 +23,8 @@ const messagesRoutes = require("./routes/messages");
 const dashboardRoutes = require("./routes/dashboard");
 const settingsRoutes = require("./routes/settings");
 const { recoverStuckPayments } = require("./services/paymentRecovery");
-
-const {
-  standardLimiter,
-  mpesaLimiter,
-  smsLimiter,
-  authLimiter,
-} = require("./middleware/rateLimiter");
+const malipoRoutes = require("./routes/malipo");
+const { standardLimiter, mpesaLimiter, smsLimiter, authLimiter,} = require("./middleware/rateLimiter");
 
 
 const app = express();
@@ -44,7 +38,10 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({
+    limit: "10mb",
+    verify: (req, res, buf) => {req.rawBody = buf;},
+}));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // Health check — public, no auth required
@@ -71,6 +68,8 @@ app.use("/api/accounting", accountingRoutes);
 app.use("/api/messages", messagesRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/settings", settingsRoutes);
+app.use("/api/malipo", malipoRoutes);
+
 
 
 
@@ -88,7 +87,7 @@ const server = app.listen(PORT, async () => {
 const softDeleteOldPackages = async () => {
     try {
         const { pool } = require('./config/db');
-        // 1. Soft-delete tips belonging to those packages
+        //  Soft-delete tips belonging to those packages
         await pool.query(
             `UPDATE tips
        SET deleted_at = NOW()
@@ -98,7 +97,7 @@ const softDeleteOldPackages = async () => {
          AND p.is_active = false
          AND p.deactivated_at < NOW() - INTERVAL '90 days'`
         );
-        // 2. Soft-delete the packages themselves
+        // Soft-delete the packages themselves
         const result = await pool.query(
             `UPDATE packages
        SET deleted_at = NOW()
