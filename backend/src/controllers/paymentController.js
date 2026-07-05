@@ -7,10 +7,8 @@ const redis = require("../config/redis");
 const { sendSMS } = require("../services/smsService");
 const { sendTipsDelivery } = require('../services/smsService');
 const { updateActiveTier } = require("../services/tierService");
+const { MIN_PACKAGE_PRICE, MAX_REASONABLE_AMOUNT } = require("../config/constants");
 
-// Boundary constants to protect the system from out-of-bounds payment values
-const MIN_PACKAGE_PRICE = 1;        // Minimum system package price
-const MAX_REASONABLE_AMOUNT = 250000; // Sane transaction cap threshold
 
 /**
  * Handle M-Pesa C2B (Buy Goods) callback.
@@ -227,8 +225,6 @@ async function getPayments(req, res) {
  * - Updates payment status to 'matched' and resolved = true.
  * - Clears the accounting summary cache in Redis.
  */
-// controllers/paymentController.js – resolvePayment (full updated function)
-
 async function resolvePayment(req, res) {
   const { id } = req.params;
   const adminId = req.user?.id;
@@ -286,10 +282,9 @@ async function resolvePayment(req, res) {
       );
     }
 
-    // ---- Full resolution with matched package ----
     const packageRes = await client.query(
       `SELECT price, game_count FROM packages WHERE id = $1`,
-      [resolvedPackageId]          // CHANGED: use resolvedPackageId instead of payment.matched_package_id
+      [resolvedPackageId]
     );
     if (packageRes.rows.length === 0) {
       await client.query("ROLLBACK");
@@ -307,7 +302,7 @@ async function resolvePayment(req, res) {
     // Package completeness check
     const totalTipsRes = await client.query(
       `SELECT COUNT(*) AS total_tips FROM tips WHERE package_id = $1`,
-      [resolvedPackageId]          // CHANGED: use resolvedPackageId
+      [resolvedPackageId]
     );
     const totalTips = parseInt(totalTipsRes.rows[0].total_tips);
     if (totalTips < gameCount) {
@@ -322,7 +317,7 @@ async function resolvePayment(req, res) {
       `INSERT INTO purchases (phone_number, package_id, payment_id, amount_paid)
        VALUES ($1, $2, $3, $4)
        RETURNING id`,
-      [phone_number, resolvedPackageId, id, amount]   // CHANGED: use resolvedPackageId
+      [phone_number, resolvedPackageId, id, amount]
     );
 
     const purchaseId = purchaseResult.rows[0].id;
@@ -338,7 +333,7 @@ async function resolvePayment(req, res) {
       [phone_number]
     );
 
-    // CHANGED: extended shouldSendTips to cover more statuses
+    // Extended shouldSendTips to cover more statuses
     const NO_TIPS_YET_STATUSES = new Set([
       "flagged_incomplete_package",
       "processing",
@@ -352,7 +347,7 @@ async function resolvePayment(req, res) {
         `SELECT game_name, prediction FROM tips
          WHERE package_id = $1 AND status = 'pending'
          ORDER BY "order" ASC`,
-        [resolvedPackageId]        // CHANGED: use resolvedPackageId
+        [resolvedPackageId]
       );
       const tips = tipsRes.rows;
 
