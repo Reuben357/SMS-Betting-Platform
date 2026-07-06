@@ -1,8 +1,4 @@
 // Auth0 JWT validation + role-based access guards.
-// Usage:
-//   router.get("/summary", requireAdmin, getAccountingSummary);
-//   router.get("/tips",    requireAnyUser, getTips);
-
 const { auth, claimCheck } = require("express-oauth2-jwt-bearer");
 require("dotenv").config();
 
