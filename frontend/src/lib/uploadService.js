@@ -61,24 +61,13 @@ export async function enqueueFiles(files, onBatchComplete) {
     notify();
 
     try {
-      // Get fresh access token for this request
-      const tokenRes = await fetch("/api/auth/access-token");
-      if (!tokenRes.ok) throw new Error("Could not retrieve access token.");
-      const { accessToken } = await tokenRes.json();
-
       const formData = new FormData();
       formData.append("file", file);
 
-      // Direct call to backend (bypass Next.js proxy) – no timeout risk
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/uploads/csv`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${accessToken}` },
-          body: formData,
-
-        },
-      );
+      const res = await fetch("/api/proxy/uploads/csv", {
+        method: "POST",
+        body: formData,
+      });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Upload failed.`);

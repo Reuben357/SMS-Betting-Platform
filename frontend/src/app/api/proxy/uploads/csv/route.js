@@ -13,9 +13,12 @@ export async function POST(req) {
     const { token: accessToken } = await auth0.getAccessToken({req});
     const formData = await req.formData();
 
+    const originalHost = req.headers.get("host") || "jengatips.com";
+
     const backendRes = await fetch(`${API_URL}/api/uploads/csv`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${accessToken}` },
+      headers: { Authorization: `Bearer ${accessToken}`,
+      "Host": originalHost,},
       body: formData,
       signal: AbortSignal.timeout(280000), // 4m40s — under the 5min route limit
     });
