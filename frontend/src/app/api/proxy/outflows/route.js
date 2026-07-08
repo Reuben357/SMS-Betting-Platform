@@ -1,8 +1,7 @@
-import { connection } from 'next/server';
 import { auth0 } from "@/lib/auth0";
 import { NextResponse } from "next/server";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_URL = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || "http://backend:5000";
 
 export async function GET(req) {
   try {
@@ -32,7 +31,6 @@ export async function GET(req) {
 export async function POST(req) {
 
   try {
-    //
     const { token: accessToken } = await auth0.getAccessToken();
     const body = await req.json();
 
