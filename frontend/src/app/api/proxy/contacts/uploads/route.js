@@ -5,7 +5,7 @@ const API_URL = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_
 
 export async function GET(req) {
   try {
-    const { token: accessToken } = await auth0.getAccessToken(req);
+    const { token: accessToken } = await auth0.getAccessToken({req});
 
     // Forward pagination params to backend
     const { searchParams } = new URL(req.url);

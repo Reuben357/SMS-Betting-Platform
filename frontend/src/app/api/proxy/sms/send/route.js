@@ -6,7 +6,7 @@ const API_URL = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_
 export async function POST(req) {
   try {
     //
-    const { token: accessToken } = await auth0.getAccessToken(req);
+    const { token: accessToken } = await auth0.getAccessToken({req});
     const body = await req.json();
     const backendRes = await fetch(`${API_URL}/api/sms/send`, {
       method: "POST",

@@ -57,7 +57,7 @@ export async function PUT(req) {
 export async function POST(req) {
   try {
     //
-    const { token: accessToken } = await auth0.getAccessToken(req);
+    const { token: accessToken } = await auth0.getAccessToken({req});
     const body = await req.json();
 
     const url = new URL(req.url);

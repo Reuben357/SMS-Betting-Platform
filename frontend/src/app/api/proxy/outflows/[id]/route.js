@@ -6,7 +6,7 @@ const API_URL = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_
 export async function PUT(req, { params }) {
     try {
         //
-        const { token: accessToken } = await auth0.getAccessToken(req);
+        const { token: accessToken } = await auth0.getAccessToken({req});
         const { id } = await params;
         const body = await req.json();
 
@@ -30,7 +30,7 @@ export async function PUT(req, { params }) {
 export async function DELETE(req, { params }) {
     try {
         //
-        const { token: accessToken } = await auth0.getAccessToken(req);
+        const { token: accessToken } = await auth0.getAccessToken({req});
         const { id } = await params;
 
         const backendRes = await fetch(`${API_URL}/api/outflows/${id}`, {

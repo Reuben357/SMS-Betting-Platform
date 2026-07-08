@@ -6,7 +6,7 @@ const API_URL = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_
 export async function GET(req) {
   try {
     //
-    const { token: accessToken } = await auth0.getAccessToken(req);
+    const { token: accessToken } = await auth0.getAccessToken({req});
     const backendRes = await fetch(`${API_URL}/api/customers/stats`, {
       headers: { Authorization: `Bearer ${accessToken}` },
       cache: "no-store",
