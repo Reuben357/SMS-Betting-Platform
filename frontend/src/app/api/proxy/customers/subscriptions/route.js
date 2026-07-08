@@ -7,7 +7,7 @@ export async function GET(req) {
 
   try {
     //
-    const { token: accessToken } = await auth0.getAccessToken();
+    const { token: accessToken } = await auth0.getAccessToken(req);
     const { searchParams } = new URL(req.url);
     const page = searchParams.get("page") || "1";
     const limit = searchParams.get("limit") || "20";

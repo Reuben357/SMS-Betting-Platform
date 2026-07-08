@@ -6,7 +6,7 @@ const API_URL = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_
 export async function GET(req) {
   try {
     //
-    const { token: accessToken } = await auth0.getAccessToken();
+    const { token: accessToken } = await auth0.getAccessToken(req);
     const { searchParams } = new URL(req.url);
     const page = searchParams.get("page") || "1";
     const limit = searchParams.get("limit") || "20";
@@ -31,7 +31,7 @@ export async function GET(req) {
 export async function POST(req) {
 
   try {
-    const { token: accessToken } = await auth0.getAccessToken();
+    const { token: accessToken } = await auth0.getAccessToken(req);
     const body = await req.json();
 
     const backendRes = await fetch(`${API_URL}/api/outflows`, {

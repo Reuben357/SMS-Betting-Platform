@@ -13,7 +13,7 @@ export async function GET(req) {
   try {
     // Get the access token for the authenticated user
     //
-    const { token: accessToken } = await auth0.getAccessToken();
+    const { token: accessToken } = await auth0.getAccessToken(req);
     // Call the backend dashboard endpoint
     const backendRes = await fetch(`${API_URL}/api/dashboard`, {
       headers: {

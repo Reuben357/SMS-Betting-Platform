@@ -6,7 +6,7 @@ const API_URL = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_
 export async function GET(req) {
   try {
     //
-    const { token: accessToken } = await auth0.getAccessToken();
+    const { token: accessToken } = await auth0.getAccessToken(req);
 
     const backendRes = await fetch(`${API_URL}/api/tiers`, {
       headers: {
@@ -30,7 +30,7 @@ export async function GET(req) {
 export async function PUT(req) {
   try {
     //
-    const { token: accessToken } = await auth0.getAccessToken();
+    const { token: accessToken } = await auth0.getAccessToken(req);
     const body = await req.json();
 
     const backendRes = await fetch(`${API_URL}/api/tiers`, {
@@ -57,7 +57,7 @@ export async function PUT(req) {
 export async function POST(req) {
   try {
     //
-    const { token: accessToken } = await auth0.getAccessToken();
+    const { token: accessToken } = await auth0.getAccessToken(req);
     const body = await req.json();
 
     const url = new URL(req.url);

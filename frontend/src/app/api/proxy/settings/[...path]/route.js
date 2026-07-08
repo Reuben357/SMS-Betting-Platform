@@ -6,7 +6,7 @@ const API_URL = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_
 export async function GET(req, { params }) {
   try {
     //
-    const { token: accessToken } = await auth0.getAccessToken();
+    const { token: accessToken } = await auth0.getAccessToken(req);
     const resolvedParams = await params;
     const path = resolvedParams.path?.join("/") || "";
     const backendRes = await fetch(
@@ -25,7 +25,7 @@ export async function GET(req, { params }) {
 export async function PUT(req, { params }) {
   try {
     //
-    const { token: accessToken } = await auth0.getAccessToken();
+    const { token: accessToken } = await auth0.getAccessToken(req);
     const resolvedParams = await params;
     const path = resolvedParams.path?.join("/") || "";
     const body = await req.json();

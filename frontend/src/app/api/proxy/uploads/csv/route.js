@@ -10,7 +10,7 @@ export const maxDuration = 300; // 5 minutes — Next.js route timeout
 
 export async function POST(req) {
   try {
-    const { token: accessToken } = await auth0.getAccessToken();
+    const { token: accessToken } = await auth0.getAccessToken(req);
     const formData = await req.formData();
 
     const backendRes = await fetch(`${API_URL}/api/uploads/csv`, {
