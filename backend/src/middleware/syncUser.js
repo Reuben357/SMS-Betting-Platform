@@ -21,13 +21,15 @@ async function syncUser(req, res, next) {
     const role = roles.includes("admin") ? "admin" : "staff";
 
     // Get email and name – first from custom claims, then fallback to standard claims
-    const email = payload[`${NAMESPACE}/email`] ?? payload.email ?? null;
-    const name =
-      payload[`${NAMESPACE}/name`] ??
-      payload.name ??
-      payload.given_name ??
-      payload.nickname ??
-      null;
+   let email = payload[`${NAMESPACE}/email`] ?? payload.email ?? null;
+    if (!email) {
+      email = `${auth0Id}@jengatips.com`;
+    }
+
+   let name = payload[`${NAMESPACE}/name`] ?? payload.name ?? payload.given_name ?? payload.nickname;
+    if (!name || name === null || name === "null") {
+      name = "JengaTips User";
+    }
 
     // Upsert user – email is only set on first insert to avoid conflicts
     const result = await pool.query(
