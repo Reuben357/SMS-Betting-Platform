@@ -9,6 +9,7 @@ export const auth0 = new Auth0Client({
         callback: "/api/auth/callback",
         backChannelLogout: "/api/auth/backchannel-logout",
         profile: "/api/auth/me",
+        accessToken: "/api/auth/access-token",
     },
     authorizationParameters: {
         audience: process.env.AUTH0_AUDIENCE,
