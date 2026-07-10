@@ -87,7 +87,7 @@ async function sendTipsDelivery(
   const templateResult = await pool.query(
       `SELECT value FROM system_settings WHERE key = 'tips_delivery_template'`
   );
-  let template = templateResult.rows[0]?.value || 'Your tips:\n{tips}'; // fallback
+  let template = templateResult.rows[0]?.value || '{tips}'; // fallback
 
   // 2. Replace the placeholder with the actual tips
   const content = template.replace(/{tips}/g, tipsContent);
