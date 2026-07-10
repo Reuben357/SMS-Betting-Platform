@@ -91,6 +91,10 @@ function TemplatePanel() {
                 if (data.preview_tips) {
                     setPreviewTips(data.preview_tips);
                 }
+                // Load preview amount
+                if (data.preview_amount) {
+                    setPreviewAmount(data.preview_amount);
+                }
             })
             .catch(() =>
                 setStatusMsg({type: "error", text: "Failed to load templates."})
@@ -137,6 +141,7 @@ function TemplatePanel() {
                     payment_confirmation: templates.payment_confirmation,
                     tips_delivery: templates.tips_delivery,
                     preview_tips: previewTips,
+                    preview_amount: previewAmount,
                 }),
             });
             if (!res.ok) throw new Error("Save failed");
@@ -360,7 +365,7 @@ function TemplatePanel() {
                             setTemplates({...templates, tips_delivery: e.target.value})
                         }
                         style={styles.textarea}
-                        placeholder="Your tips:\n{tips}"
+                        placeholder="{tips}"
                     />
                     <div style={{display: "flex", gap: "12px", marginTop: "8px"}}>
                         <button
