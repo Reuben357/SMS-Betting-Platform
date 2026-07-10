@@ -56,13 +56,17 @@ async function getTemplates(req, res) {
           "Thank you for your payment of KES {amount}. Your tips will arrive shortly.",
       tips_delivery: "{tips}",
       preview_tips: "1. Fc Copenhagen v Napoli (o1.5)\n2. Bodoe/Glimt v Man City (2)\n3. Inter Milano v Arsenal (u2.5)\n4. Olympiacos v Leverkusen (GG)\n5. Tottenham v Dortmund (GG)",
+      preview_amount: "1000",
     };
     for (const row of result.rows) {
       if (row.key === "payment_confirmation_template")
         templates.payment_confirmation = row.value;
       if (row.key === "tips_delivery_template")
         templates.tips_delivery = row.value;
-      if (row.key === "tips_preview_example") templates.preview_tips = row.value;
+      if (row.key === "tips_preview_example")
+        templates.preview_tips = row.value;
+      if (row.key === "preview_amount")
+        templates.preview_amount = row.value;
 
     }
     res.json(templates);
@@ -78,7 +82,7 @@ async function getTemplates(req, res) {
  * Body: { payment_confirmation: string, tips_delivery: string }
  */
 async function updateTemplates(req, res) {
-  const { payment_confirmation, tips_delivery, preview_tips } = req.body;
+  const { payment_confirmation, tips_delivery, preview_tips, preview_amount } = req.body;
   if (!payment_confirmation || !tips_delivery) {
     return res.status(400).json({ error: "Both templates are required." });
   }
@@ -104,6 +108,14 @@ async function updateTemplates(req, res) {
          ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
           [preview_tips]
       );
+
+      if (preview_amount !== undefined &&  preview_amount !== null) {
+        await client.query(
+            `INSERT INTO system_settings (key, value) VALUES ('preview_amount', $1)
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+            [preview_amount.toString()]
+        )
+      }
     }
 
     await client.query("COMMIT");
