@@ -22,7 +22,6 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=appuser:appgroup /app/.next/standalone ./
 COPY --from=builder --chown=appuser:appgroup /app/.next/static ./.next/static
 
-COPY --chown=appuser:appgroup .env.production ./.env.production
 
 USER appuser
 
