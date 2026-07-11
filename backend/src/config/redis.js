@@ -1,5 +1,7 @@
 const { createClient } = require('redis');
 require('dotenv').config();
+const { logger } = require('../middleware/errorHandler');
+
 
 const client = createClient({
   url: process.env.REDIS_URL,

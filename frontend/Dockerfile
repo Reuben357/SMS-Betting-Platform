@@ -24,7 +24,7 @@ COPY --from=builder --chown=appuser:appgroup /app/.next/static ./.next/static
 
 
 USER appuser
-
+ 
 ENV PORT=3000
 EXPOSE 3000
 

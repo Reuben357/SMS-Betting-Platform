@@ -79,8 +79,8 @@ function TemplatePanel() {
     const paymentIsNearLimit = paymentCharCount > PAYMENT_LIMIT * 0.9 && paymentCharCount <= PAYMENT_LIMIT;
     const paymentSmsUnits = Math.ceil(paymentCharCount / PAYMENT_LIMIT) || 1;
 
-    useEffect(() => {
-        fetch("/api/proxy/settings/templates")
+    const loadTemplates = useCallback(() => {
+        return fetch("/api/proxy/settings/templates", { cache: "no-store" })
             .then((r) => r.json())
             .then((data) => {
                 setTemplates({
@@ -91,16 +91,24 @@ function TemplatePanel() {
                 if (data.preview_tips) {
                     setPreviewTips(data.preview_tips);
                 }
+                // Load preview amount
+                if (data.preview_amount) {
+                    setPreviewAmount(data.preview_amount);
+                }
             })
             .catch(() =>
                 setStatusMsg({type: "error", text: "Failed to load templates."})
             );
+    }, []);
 
-        fetch("/api/proxy/settings/payment-confirmation")
+    useEffect(() => {
+        loadTemplates();
+
+        fetch("/api/proxy/settings/payment-confirmation", { cache: "no-store" })
             .then((r) => r.json())
             .then((data) => setPaymentConfirmationEnabled(data.enabled))
             .catch(() => {});
-    }, []);
+    }, [loadTemplates]);
 
     const insertPlaceholder = (textareaRef, placeholder) => {
         const textarea = textareaRef.current;
@@ -132,14 +140,17 @@ function TemplatePanel() {
         try {
             const res = await fetch("/api/proxy/settings/templates", {
                 method: "PUT",
+                cache: "no-store",
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({
                     payment_confirmation: templates.payment_confirmation,
                     tips_delivery: templates.tips_delivery,
                     preview_tips: previewTips,
+                    preview_amount: previewAmount,
                 }),
             });
             if (!res.ok) throw new Error("Save failed");
+            await loadTemplates();
             setStatusMsg({type: "success", text: "Templates saved successfully."});
         } catch (err) {
             setStatusMsg({type: "error", text: err.message});
@@ -360,7 +371,7 @@ function TemplatePanel() {
                             setTemplates({...templates, tips_delivery: e.target.value})
                         }
                         style={styles.textarea}
-                        placeholder="Your tips:\n{tips}"
+                        placeholder="{tips}"
                     />
                     <div style={{display: "flex", gap: "12px", marginTop: "8px"}}>
                         <button

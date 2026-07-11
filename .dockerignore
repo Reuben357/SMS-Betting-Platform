@@ -1,0 +1,74 @@
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+**/*.md
+docs/
+LICENSE
+
+# Docker files (prevent recursive builds)
+Dockerfile*
+docker-compose*
+.docker/
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test files
+**/test/
+**/tests/
+**/__tests__/
+**/*.test.*
+**/*.spec.*
+coverage/
+
+# Build artifacts (will be generated in container)
+dist/
+build/
+out/
+
+# Dependencies (will be installed in container)
+node_modules/
+.npm/
+yarn-debug.log*
+yarn-error.log*
+
+# Environment and secrets
+.env
+.env.*
+*.pem
+*.key
+credentials/
+secrets/
+
+# Logs and profiles
+**/*.log
+npm-debug.log*
+**/logs/
+*.cpuprofile
+*.heapprofile
+*.memprofile
+
+# Temporary files
+tmp/
+temp/
+**/*.tmp
+
+# Development
+.eslintcache
+.prettierignore
+nodemon.json
+
+storage/uploads
+README.md
+

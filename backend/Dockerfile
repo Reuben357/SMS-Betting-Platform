@@ -12,10 +12,11 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN mkdir -p storage/uploads && chown -R appuser:appgroup /app
 
 USER appuser
 
 EXPOSE 5000
 
-CMD ["node", "src/index.js"]
+ENTRYPOINT ["docker-entrypoint.sh"]
