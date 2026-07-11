@@ -49,7 +49,7 @@ async function updatePaymentConfirmation(req, res) {
 async function getTemplates(req, res) {
   try {
     const result = await pool.query(
-        `SELECT key, value FROM system_settings WHERE key IN ('payment_confirmation_template', 'tips_delivery_template', 'tips_preview_example')`,
+        `SELECT key, value FROM system_settings WHERE key IN ('payment_confirmation_template', 'tips_delivery_template', 'tips_preview_example', 'preview_amount')`,
     );
     const templates = {
       payment_confirmation:
