@@ -79,8 +79,8 @@ function TemplatePanel() {
     const paymentIsNearLimit = paymentCharCount > PAYMENT_LIMIT * 0.9 && paymentCharCount <= PAYMENT_LIMIT;
     const paymentSmsUnits = Math.ceil(paymentCharCount / PAYMENT_LIMIT) || 1;
 
-    useEffect(() => {
-        fetch("/api/proxy/settings/templates")
+    const loadTemplates = useCallback(() => {
+        return fetch("/api/proxy/settings/templates", { cache: "no-store" })
             .then((r) => r.json())
             .then((data) => {
                 setTemplates({
@@ -99,12 +99,16 @@ function TemplatePanel() {
             .catch(() =>
                 setStatusMsg({type: "error", text: "Failed to load templates."})
             );
+    }, []);
 
-        fetch("/api/proxy/settings/payment-confirmation")
+    useEffect(() => {
+        loadTemplates();
+
+        fetch("/api/proxy/settings/payment-confirmation", { cache: "no-store" })
             .then((r) => r.json())
             .then((data) => setPaymentConfirmationEnabled(data.enabled))
             .catch(() => {});
-    }, []);
+    }, [loadTemplates]);
 
     const insertPlaceholder = (textareaRef, placeholder) => {
         const textarea = textareaRef.current;
@@ -136,6 +140,7 @@ function TemplatePanel() {
         try {
             const res = await fetch("/api/proxy/settings/templates", {
                 method: "PUT",
+                cache: "no-store",
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({
                     payment_confirmation: templates.payment_confirmation,
@@ -145,6 +150,7 @@ function TemplatePanel() {
                 }),
             });
             if (!res.ok) throw new Error("Save failed");
+            await loadTemplates();
             setStatusMsg({type: "success", text: "Templates saved successfully."});
         } catch (err) {
             setStatusMsg({type: "error", text: err.message});
