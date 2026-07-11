@@ -1,4 +1,9 @@
-version: '3.8'
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
 
 services:
   postgres:
@@ -13,6 +18,7 @@ services:
       - jengatips-db-data:/var/lib/postgresql/data
     networks:
       - jengatips-net
+    logging: *default-logging
 
   # Secured Redis Engine Block
   redis:
@@ -24,6 +30,8 @@ services:
       - jengatips-redis-data:/data
     networks:
       - jengatips-net
+    logging: *default-logging
+
 
   # Express Backend Container API Instance
   backend:
@@ -35,6 +43,8 @@ services:
     environment:
       DB_HOST: postgres
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      NODE_ENV: production
+
     depends_on:
       - postgres
       - redis
@@ -44,6 +54,8 @@ services:
       - "5000"
     volumes:
       - jengatips-uploads:/app/storage/uploads
+    logging: *default-logging
+
 
   # Next.js Frontend Container Instance
   frontend:
@@ -65,6 +77,8 @@ services:
       - jengatips-net
     expose:
       - "3000"
+    logging: *default-logging
+
 
   # Nginx Core Routing / Reverse Proxy Layer
   nginx:
@@ -81,6 +95,8 @@ services:
       - frontend
     networks:
       - jengatips-net
+    logging: *default-logging
+
 
 networks:
   jengatips-net:

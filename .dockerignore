@@ -68,3 +68,7 @@ temp/
 .eslintcache
 .prettierignore
 nodemon.json
+
+storage/uploads
+README.md
+
