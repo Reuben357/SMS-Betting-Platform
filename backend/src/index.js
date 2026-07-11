@@ -3,6 +3,8 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const { logger } = require("./middleware/errorHandler");
+const { httpLogger } = require('./middleware/logger');
+
 
 
 const uploadRoutes = require('./routes/uploads');
@@ -25,9 +27,14 @@ const settingsRoutes = require("./routes/settings");
 const { recoverStuckPayments } = require("./services/paymentRecovery");
 const malipoRoutes = require("./routes/malipo");
 const { standardLimiter, mpesaLimiter, smsLimiter, authLimiter,} = require("./middleware/rateLimiter");
+const { startScheduler } = require('./cron/scheduler');
+const redisClient = require('./config/redis');
+
 
 
 const app = express();
+app.use(httpLogger);
+
 
 app.use(helmet());
 app.use(
@@ -42,6 +49,14 @@ app.use(express.json({
     limit: "10mb",
     verify: (req, res, buf) => {req.rawBody = buf;},
 }));
+app.use(
+    express.json({
+        limit: '10mb',
+        verify: (req, res, buf) => {
+            req.rawBody = buf;
+        },
+    }),
+);
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // Health check — public, no auth required
@@ -79,81 +94,25 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 const server = app.listen(PORT, async () => {
   logger.info(`Server running on port ${PORT}`);
-  await recoverStuckPayments();
-  setInterval(recoverStuckPayments, 5 * 60 * 1000);
+    startScheduler();
 });
-
-// Soft-delete packages and their tips that were deactivated > 90 days ago
-const softDeleteOldPackages = async () => {
-    try {
-        const { pool } = require('./config/db');
-        //  Soft-delete tips belonging to those packages
-        await pool.query(
-            `UPDATE tips
-       SET deleted_at = NOW()
-       FROM packages p
-       WHERE tips.package_id = p.id
-         AND p.deleted_at IS NULL
-         AND p.is_active = false
-         AND p.deactivated_at < NOW() - INTERVAL '90 days'`
-        );
-        // Soft-delete the packages themselves
-        const result = await pool.query(
-            `UPDATE packages
-       SET deleted_at = NOW()
-       WHERE is_active = false
-         AND deleted_at IS NULL
-         AND deactivated_at < NOW() - INTERVAL '90 days'`
-        );
-        if (result.rowCount > 0) {
-            logger.info(`Soft-deleted ${result.rowCount} old packages (and their tips)`);
-        }
-    } catch (err) {
-        logger.error(`Package soft delete error: ${err.message}`);
-    }
-};
-
-// Run every day at 3 AM (after the messages job at 2 AM)
-setInterval(softDeleteOldPackages, 24 * 60 * 60 * 1000);
-
-
-// Soft Delete Messages
-const softDeleteOldMessages = async () => {
-    try {
-        const { pool } = require('./config/db');
-        // Delete messages older than 90 days that are already sent
-        const result = await pool.query(
-            `UPDATE messages
-       SET deleted_at = NOW()
-       WHERE status IN ('sent', 'failed')
-         AND created_at < NOW() - INTERVAL '90 days'
-         AND deleted_at IS NULL`
-        );
-        if (result.rowCount > 0) {
-            logger.info(`Soft-deleted ${result.rowCount} old messages`);
-        }
-    } catch (err) {
-        logger.error(`Soft delete error: ${err.message}`);
-    }
-};
-// Run every day at 2 AM
-setInterval(softDeleteOldMessages, 24 * 60 * 60 * 1000);
-
 
 
 // Graceful shutdown on OS signals
 async function shutdown(signal) {
-  console.log(`\nReceived ${signal}. Shutting down gracefully...`);
-  server.close(async () => {
-    console.log('HTTP server closed.');
-    await gracefulShutdown(signal);
-  });
+    logger.info(`Received ${signal}. Shutting down gracefully...`);
+    server.close(async () => {
+        logger.info('HTTP server closed.');
+        await gracefulShutdown(signal);
+        try {
+            await redisClient.quit();
+            logger.info('Redis client closed.');
+        } catch (err) {
+            logger.error({ err }, 'Error while closing Redis client');
+        }
+        process.exit(0);
+    });
 }
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
-
-// Catch any unhandled promise rejections
-process.on('unhandledRejection', (reason) => {
-  console.error('Unhandled promise rejection:', reason);
-});
