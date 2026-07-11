@@ -1,13 +1,16 @@
-const { Pool } = require('pg');
 require('dotenv').config();
+const { Pool } = require('pg');
+const { readSecret } = require('./secrets');
 const { logger } = require('../middleware/errorHandler');
 
+const dbPassword = readSecret('DB_PASSWORD_FILE', 'DB_PASSWORD');
+
 const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: parseInt(process.env.DB_PORT || '5432', 10),
   database: process.env.DB_NAME,
+  host: process.env.DB_HOST,
+  password: dbPassword,
+  port: parseInt(process.env.DB_PORT || '5432', 10),
   user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
 });
 
 pool.on('connect', () => {
@@ -28,4 +31,4 @@ async function gracefulShutdown(signal) {
   }
 }
 
-module.exports = { pool, gracefulShutdown };
+module.exports = { gracefulShutdown, pool };
