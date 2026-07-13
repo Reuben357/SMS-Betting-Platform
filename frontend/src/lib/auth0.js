@@ -1,8 +1,11 @@
 import { Auth0Client } from "@auth0/nextjs-auth0/server";
+import { readSecret } from "./secrets";
 
 const ROLES_CLAIM = "https://betting-tips-api/roles";
 
 export const auth0 = new Auth0Client({
+    clientSecret: readSecret("AUTH0_CLIENT_SECRET_FILE", "AUTH0_CLIENT_SECRET", false),
+    secret: readSecret("AUTH0_SECRET_FILE", "AUTH0_SECRET", false),
     routes: {
         login: "/api/auth/login",
         logout: "/api/auth/logout",
@@ -25,7 +28,5 @@ export const auth0 = new Auth0Client({
                 [ROLES_CLAIM]: session.user[ROLES_CLAIM] ?? [],
             },
         };
-
-        console.log(JSON.stringify(session.user, null, 2))
     },
 });
