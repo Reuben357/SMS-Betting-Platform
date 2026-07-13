@@ -7,6 +7,8 @@ SECRET_NAMES=(
   "auth0_mgmt_client_secret"
   "db_password"
   "emalify_api_key"
+  "frontend_auth0_client_secret"
+  "frontend_auth0_secret"
   "malipo_callback_secret_path"
   "malipo_webhook_secret"
   "mpesa_callback_secret_path"
