@@ -1,39 +1,16 @@
-const { ManagementClient } = require("auth0");
-require("dotenv").config();
+require('dotenv').config();
+const { ManagementClient } = require('auth0');
+const { readSecret } = require('../config/secrets');
 
 let managementClient = null;
 
-function getManagementClient() {
-  if (!managementClient) {
-    // Validate required environment variables
-    if (
-      !process.env.AUTH0_DOMAIN ||
-      !process.env.AUTH0_MGMT_CLIENT_ID ||
-      !process.env.AUTH0_MGMT_CLIENT_SECRET
-    ) {
-      throw new Error("Auth0 Management API credentials missing.");
-    }
-    managementClient = new ManagementClient({
-      domain: process.env.AUTH0_DOMAIN,
-      clientId: process.env.AUTH0_MGMT_CLIENT_ID,
-      clientSecret: process.env.AUTH0_MGMT_CLIENT_SECRET,
-    });
-  }
-  return managementClient;
-}
-
-/**
- * Create a user in Auth0 and assign a role.
- * @param {Object} params - { email, password, name, roleId }
- * @returns {Promise<string>} Auth0 user ID
- */
 async function createAuth0User({ email, password, name, roleId }) {
   const client = getManagementClient();
 
   // Create user
   const user = await client.users.create({
     connection:
-      process.env.AUTH0_CONNECTION || "Username-Password-Authentication",
+        process.env.AUTH0_CONNECTION || 'Username-Password-Authentication',
     email,
     password,
     name,
@@ -46,6 +23,31 @@ async function createAuth0User({ email, password, name, roleId }) {
   await client.users.assignRoles({ id: userId }, { roles: [roleId] });
 
   return userId;
+}
+
+function getManagementClient() {
+  if (!managementClient) {
+    const missing = [];
+    if (!process.env.AUTH0_DOMAIN) missing.push('AUTH0_DOMAIN');
+    if (!process.env.AUTH0_MGMT_CLIENT_ID) missing.push('AUTH0_MGMT_CLIENT_ID');
+
+    const clientSecret = readSecret(
+        'AUTH0_MGMT_CLIENT_SECRET_FILE',
+        'AUTH0_MGMT_CLIENT_SECRET'
+    );
+    if (!clientSecret) missing.push('AUTH0_MGMT_CLIENT_SECRET');
+
+    if (missing.length > 0) {
+      throw new Error(`Auth0 Management API credentials missing: ${missing.join(', ')}`);
+    }
+
+    managementClient = new ManagementClient({
+      domain: process.env.AUTH0_DOMAIN,
+      clientId: process.env.AUTH0_MGMT_CLIENT_ID,
+      clientSecret,
+    });
+  }
+  return managementClient;
 }
 
 module.exports = { createAuth0User };
