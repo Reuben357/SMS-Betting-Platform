@@ -13,7 +13,7 @@ export async function POST(req) {
     const { token: accessToken } = await auth0.getAccessToken({req});
     const formData = await req.formData();
 
-    const originalHost = req.headers.get("host") || "jengatips.com";
+    const originalHost = req.headers.get("host") || "multitips.net";
 
     const backendRes = await fetch(`${API_URL}/api/uploads/csv`, {
       method: "POST",

@@ -1,4 +1,4 @@
-// Centralised design tokens for the JENGATIPS admin UI ("Midnight Gold" theme).
+// Centralised design tokens for the MULTITIPS admin UI ("Midnight Gold" theme).
 
 export const THEME = {
     colors: {

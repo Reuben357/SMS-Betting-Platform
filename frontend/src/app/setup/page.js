@@ -87,7 +87,7 @@ export default function SetupPage() {
             color: GOLD,
           }}
         >
-          JENGATIPS Setup
+          MULTITIPS Setup
         </h1>
         <p
           style={{

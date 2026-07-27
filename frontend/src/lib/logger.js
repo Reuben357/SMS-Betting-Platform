@@ -5,7 +5,7 @@ const isProd = process.env.NODE_ENV === 'production';
 export const logger = pino({
     level: process.env.LOG_LEVEL || (isProd ? 'info' : 'debug'),
     timestamp: pino.stdTimeFunctions.isoTime,
-    base: { service: 'jengatips-frontend' },
+    base: { service: 'multitips-frontend' },
     transport: isProd
         ? undefined
         : {

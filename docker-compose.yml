@@ -162,7 +162,7 @@ services:
           cpus: "0.5"
           memory: 256M
     volumes:
-      - ./nginx/jengatips.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/multitips.conf:/etc/nginx/conf.d/default.conf:ro
 
   postgres:
     container_name: jengatips-db

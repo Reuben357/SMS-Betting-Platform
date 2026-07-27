@@ -64,7 +64,7 @@ export default function Sidebar() {
             letterSpacing: "-0.5px",
           }}
         >
-          JENGATIPS
+          MULTITIPS
         </h1>
         <p
           style={{

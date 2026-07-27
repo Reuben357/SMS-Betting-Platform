@@ -6,7 +6,7 @@ const isProd = process.env.NODE_ENV === 'production';
 const logger = pino({
     level: process.env.LOG_LEVEL || (isProd ? 'info' : 'debug'),
     timestamp: pino.stdTimeFunctions.isoTime,
-    base: { service: 'jengatips-backend' },
+    base: { service: 'multitips-backend' },
     // Prod: plain JSON to stdout -- docker logs / any log shipper can read it.
     // Dev: pretty-printed, human readable, via pino-pretty.
     transport: isProd

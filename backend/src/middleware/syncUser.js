@@ -23,12 +23,12 @@ async function syncUser(req, res, next) {
     // Get email and name – first from custom claims, then fallback to standard claims
    let email = payload[`${NAMESPACE}/email`] ?? payload.email ?? null;
     if (!email) {
-      email = `${auth0Id}@jengatips.com`;
+      email = `${auth0Id}@multitips.net`;
     }
 
    let name = payload[`${NAMESPACE}/name`] ?? payload.name ?? payload.given_name ?? payload.nickname;
     if (!name || name === null || name === "null") {
-      name = "JengaTips User";
+      name = "MultiTips User";
     }
 
     // Upsert user – email is only set on first insert to avoid conflicts

@@ -2,7 +2,7 @@ import Providers from "@/components/Providers";
 import "./globals.css";
 
 export const metadata = {
-    title: "JENGATIPS",
+    title: "MULTITIPS",
     description: "SMS-First Betting Tips Platform",
 };
 
