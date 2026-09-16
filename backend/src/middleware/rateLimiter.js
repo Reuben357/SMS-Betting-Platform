@@ -81,11 +81,18 @@ const uploadLimiter = rateLimit({
   message: "Upload rate limit exceeded.",
 });
 
+const dlrLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 600, //up to 600 requests per min
+  message: "DRL callback rate limit exceeded.",
+})
+
 module.exports = {
   rateLimit,
   standardLimiter,
   mpesaLimiter,
   uploadLimiter,
+  dlrLimiter,
   smsLimiter,
   authLimiter,
 };
