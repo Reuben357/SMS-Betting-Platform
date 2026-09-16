@@ -36,4 +36,15 @@ const paymentResolveSchema = z.object({
   // No body usually, but can add notes if needed
 });
 
-module.exports = { validate, setupSchema, packageSchema, paymentResolveSchema };
+const smsSendSchema = z.object({
+  message: z.string().min(1).max(918),
+  phone: z.string().optional(),
+  tier: z.number().int().positive().optional(),
+  active_tier_letter: z.string().length(1).optional(),
+  active_sub_number: z.number().int().positive().optional(),
+  jackpot: z.boolean().optional(),
+  jackpot_tier: z.number().int().positive().optional(),
+  subscription_customers: z.boolean().optional(),
+});
+
+module.exports = { validate, setupSchema, packageSchema, paymentResolveSchema, smsSendSchema };
