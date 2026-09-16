@@ -118,4 +118,65 @@ async function sendBulkSMS(req, res) {
   }
 }
 
-module.exports = { sendBulkSMS };
+async function handleOnfonDlrCallback(req, res) {
+  // TEMPORARY: keep until you confirm real Onfon values
+  logger.info(`Onfon DLR callback raw query: ${JSON.stringify(req.query)}`);
+
+  const { messageId, status, errorCode, shortMessage } = req.query;
+
+  if (!messageId) {
+    logger.warn('Onfon DLR callback: missing messageId');
+    return res.status(200).send('OK');
+  }
+
+  try {
+    const resolved = resolveOnfonDlrStatus(status);
+
+    if (resolved === undefined) {
+      logger.warn(`Onfon DLR: unmapped status "${status}" (errorCode=${errorCode}) for message ${messageId}`);
+      return res.status(200).send('OK');
+    }
+    if (resolved === null) {
+      logger.info(`Onfon DLR: non-terminal status "${status}" for message ${messageId}`);
+      return res.status(200).send('OK');
+    }
+
+    const dbStatus = resolved; // 'sent' or 'failed'
+    let failureReason = null;
+    let deliveredAt = null;
+
+    if (dbStatus === 'failed') {
+      const cleanShortMessage = String(shortMessage || '').replace(/^'+|'+$/g, '').trim();
+      failureReason = cleanShortMessage || `Onfon status: ${status}`;
+    } else if (dbStatus === 'sent') {
+      deliveredAt = new Date();
+    }
+
+
+    const  result = await pool.query(
+        `UPDATE messages
+       SET status = $1,
+           delivered_at = COALESCE($5, delivered_at),
+           failure_reason = $2,
+           dlr_payload = $4
+       WHERE message_provider_id = $3`,
+        [dbStatus, failureReason, messageId, JSON.stringify(req.query), deliveredAt],
+    );
+
+    if (result.rowCount === 0) {
+      logger.warn(`Onfon DLR callback: no message found for provider id ${messageId}`);
+    } else if (result.rowCount > 1) {
+      logger.error(`Onfon DLR callback: ${result.rowCount} messages share provider id ${messageId}`);
+    }
+    else  {
+      logger.info(`Onfon DLR callback: updated message ${messageId} to ${dbStatus} (raw status "${status}")`);
+    }
+    res.status(200).send('OK');
+  } catch (err) {
+    logger.error(`Onfon DLR callback database processing error:${err.message}`);
+    res.status(200).send('OK');
+  }
+}
+
+module.exports = { sendBulkSMS, handleOnfonDlrCallback };
+
