@@ -1,0 +1,1 @@
+ALTER TABLE messages ADD CONSTRAINT messages_message_provider_id_unique  UNIQUE (message_provider_id);
