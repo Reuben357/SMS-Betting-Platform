@@ -59,15 +59,7 @@ export default function CustomDateTimePicker({value, onChange}) {
 
         const updated = new Date(dateObj);
         updated.setHours(numericHour, parseInt(mStr, 10), 0, 0);
-
-        // Formats into local ISO variant required for controlled inputs
-        const year = updated.getFullYear();
-        const month = String(updated.getMonth() + 1).padStart(2, "0");
-        const day = String(updated.getDate()).padStart(2, "0");
-        const formattedHours = String(numericHour).padStart(2, "0");
-        const formattedMinutes = String(mStr).padStart(2, "0");
-
-        onChange(`${year}-${month}-${day}T${formattedHours}:${formattedMinutes}`);
+        onChange(updated.toISOString());
     };
 
     // Calendar generation definitions
