@@ -2,6 +2,7 @@ import { connection } from 'next/server';
 import { auth0 } from '@/lib/auth0';
 import { redirect } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
+import IdleLogoutWatcher from "../../components/IdleLogoutWatcher";
 
 export default async function AdminLayout({ children }) {
     const session = await auth0.getSession();
@@ -11,6 +12,7 @@ export default async function AdminLayout({ children }) {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
+        <IdleLogoutWatcher/>
       <Sidebar />
       <main style={{ flex: 1, background: '#f5f5f5' }}>
         {children}
