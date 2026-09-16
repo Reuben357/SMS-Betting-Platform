@@ -7,6 +7,7 @@ import {exportToCSV} from "@/lib/exportService";
 import {ChevronLeft, ChevronRight, ChevronUp, Pencil, Trash2, X, AlertTriangle} from "lucide-react";
 import CustomDatePicker from "@/components/ui/CustomDatePicker";
 import ScrollableSelect from "@/components/ui/ScrollableSelect";
+import {formatDateTime, formatDate} from "@/lib/formatDateTime";
 
 // Midnight Gold color palette
 import {BG_DARK, CARD_BG, TEXT_PRIMARY, TEXT_SECONDARY, GOLD, GOLD_LIGHT, DANGER, SUCCESS} from "@/lib/theme";
@@ -36,7 +37,7 @@ const IconFlag = () => (
     </svg>
 );
 
-// ===== STATUS BADGE (copied from payments page) =====
+// STATUS BADGE 
 const IconCheck = () => (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
          strokeLinecap="round" strokeLinejoin="round">
@@ -141,7 +142,6 @@ function StatusBadge({status}) {
     );
 }
 
-// ===== END STATUS BADGE =====
 
 export default function AccountingPage() {
     const [tab, setTab] = useState("inflow");
@@ -172,21 +172,21 @@ export default function AccountingPage() {
     const [dateTo, setDateTo] = useState("");
     const [searchPhone, setSearchPhone] = useState("");
 
-    // ===== Package filter for inflow tab =====
+    //  Package filter for inflow tab 
     const [packageFilter, setPackageFilter] = useState("all");
 
-    // ===== Scroll-to-top state =====
+    //  Scroll-to-top state 
     const [showScrollTop, setShowScrollTop] = useState(false);
 
-    // ===== EDIT / DELETE STATES =====
+    //  EDIT / DELETE STATES 
     const [editModalOpen, setEditModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState(null);
     const [savingEdit, setSavingEdit] = useState(false);
 
-    // ===== TOAST STATE =====
+    //  TOAST STATE 
     const [toast, setToast] = useState({visible: false, message: "", type: ""});
 
-    // ===== DELETE CONFIRMATION MODAL STATE =====
+    //  DELETE CONFIRMATION MODAL STATE 
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [deleteTargetId, setDeleteTargetId] = useState(null);
 
@@ -214,7 +214,7 @@ export default function AccountingPage() {
         return [...new Set(range)];
     };
 
-    // ===== Fetch accounting summary and list data with server-side filtering for inflow =====
+    //  Fetch accounting summary and list data with server-side filtering for inflow 
     const fetchAccountingData = useCallback(
         async (newPage = page, newLimit = limit) => {
             setLoading(true);
@@ -253,7 +253,7 @@ export default function AccountingPage() {
                 else items = data.purchases || [];
 
                 setRawListData(items);
-                // For inflow, the data is already filtered by the server, so we set filteredListData directly.
+                // Inflow, the data is already filtered by the server, so we set filteredListData directly.
                 setFilteredListData(items);
                 setPages(data.pages || 1);
             } catch (err) {
@@ -270,7 +270,7 @@ export default function AccountingPage() {
         fetchAccountingData();
     }, [fetchAccountingData, page, limit]);
 
-    // ===== Client-side filtering for outflow and flagged tabs only =====
+    //  Client-side filtering for outflow and flagged tabs only 
     // For inflow, filtering is already done server-side, so we skip client-side filtering.
     useEffect(() => {
         // Only apply client-side filtering for tabs that do NOT use server-side filtering
@@ -304,17 +304,17 @@ export default function AccountingPage() {
         }
     }, [rawListData, searchPhone, dateFrom, dateTo, tab]);
 
-    // ===== Reset page to 1 whenever filters change =====
+    //  Reset page to 1 whenever filters change 
     useEffect(() => {
         setPage(1);
     }, [searchPhone, dateFrom, dateTo, packageFilter]);
 
-    // ===== Reset page when tab or limit changes =====
+    //  Reset page when tab or limit changes 
     useEffect(() => {
         setPage(1);
     }, [tab, limit]);
 
-    // ===== Scroll listener for scroll-to-top =====
+    //  Scroll listener for scroll-to-top 
     useEffect(() => {
         const handleScroll = () => {
             setShowScrollTop(window.scrollY > 300);
@@ -323,7 +323,7 @@ export default function AccountingPage() {
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
-    // ===== ADD OUTFLOW =====
+    // ADD OUTFLOW 
     const handleAddOutflow = async () => {
         if (!outflowForm.amount || !outflowForm.description) {
             showToast("Please fill all fields.", "error");
@@ -352,7 +352,7 @@ export default function AccountingPage() {
         }
     };
 
-    // ===== DELETE OUTFLOW =====
+    // DELETE OUTFLOW 
     const handleDeleteClick = (id) => {
         setDeleteTargetId(id);
         setDeleteModalOpen(true);
@@ -378,7 +378,7 @@ export default function AccountingPage() {
         setDeleteTargetId(null);
     };
 
-    // ===== EDIT OUTFLOW =====
+    //  EDIT OUTFLOW 
     const handleEdit = (item) => {
         setEditingItem({
             id: item.id,
@@ -419,7 +419,7 @@ export default function AccountingPage() {
         }
     };
 
-    // ===== GO TO PAGE =====
+    //  GO TO PAGE 
     const handleGoToPage = () => {
         const pageNum = parseInt(gotoPage);
         if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= pages) {
@@ -428,7 +428,7 @@ export default function AccountingPage() {
         }
     };
 
-    // ===== OBFUSCATION =====
+    //  OBFUSCATION 
     const maskPhone = (val) => {
         if (!val || !obfuscate) return val;
         const str = String(val);
@@ -441,7 +441,7 @@ export default function AccountingPage() {
     const maskRef = (val) =>
         val && obfuscate ? `${val.slice(0, 3)}***${val.slice(-1)}` : val;
 
-    // ===== EXPORT =====
+    //  EXPORT 
     const handleExport = () => {
         let columns, rows;
         if (tab === "outflow") {
@@ -451,7 +451,7 @@ export default function AccountingPage() {
                 item.category,
                 item.amount,
                 item.entered_by_email,
-                new Date(item.created_at).toLocaleString(),
+                formatDateTime(item.created_at),
             ]);
         } else if (tab === "flagged") {
             columns = ["Phone", "Reason", "Amount", "Reference", "Date"];
@@ -460,7 +460,7 @@ export default function AccountingPage() {
                 item.status,
                 item.amount,
                 maskRef(item.mpesa_ref),
-                new Date(item.created_at).toLocaleString(),
+                formatDateTime(item.created_at),
             ]);
         } else { // inflow
             columns = ["Phone", "Package", "Amount", "Reference", "Date"];
@@ -469,7 +469,7 @@ export default function AccountingPage() {
                 item.package_name,
                 item.amount || item.amount_paid,
                 maskRef(item.mpesa_ref),
-                new Date(item.created_at).toLocaleString(),
+                formatDateTime(item.created_at),
             ]);
         }
 
@@ -485,7 +485,7 @@ export default function AccountingPage() {
                 item.category,
                 item.amount,
                 item.entered_by_email,
-                new Date(item.created_at).toLocaleString(),
+                formatDateTime(item.created_at),
             ]);
         } else if (tab === "flagged") {
             columns = ["Phone", "Reason", "Amount", "Reference", "Date"];
@@ -494,7 +494,7 @@ export default function AccountingPage() {
                 item.status,
                 item.amount,
                 maskRef(item.mpesa_ref),
-                new Date(item.created_at).toLocaleString(),
+                formatDateTime(item.created_at),
             ]);
         } else {
             columns = ["Phone", "Package", "Amount", "Reference", "Date"];
@@ -503,7 +503,7 @@ export default function AccountingPage() {
                 item.package_name,
                 item.amount || item.amount_paid,
                 maskRef(item.mpesa_ref),
-                new Date(item.created_at).toLocaleString(),
+                formatDateTime(item.created_at),
             ]);
         }
 
@@ -528,7 +528,7 @@ export default function AccountingPage() {
         <div style={{background: BG_DARK, minHeight: "100vh", color: TEXT_PRIMARY}}>
             <TopBar title="Accounting & Finance"/>
 
-            {/* ===== TOAST ===== */}
+            {/*  TOAST  */}
             {toast.visible && (
                 <div
                     style={{
@@ -933,7 +933,7 @@ export default function AccountingPage() {
                                             color: TEXT_SECONDARY,
                                         }}
                                     >
-                                        {new Date(item.created_at).toLocaleDateString()}
+                                        {formatDateTime(item.created_at)}
                                     </td>
                                     {showActions && (
                                         <td style={{padding: "16px", textAlign: "center"}}>
@@ -1075,7 +1075,7 @@ export default function AccountingPage() {
                 </div>
             </div>
 
-            {/* ===== EDIT MODAL ===== */}
+            {/*  EDIT MODAL  */}
             {editModalOpen && editingItem && (
                 <div
                     style={{
@@ -1250,7 +1250,7 @@ export default function AccountingPage() {
                 </div>
             )}
 
-            {/* ===== DELETE CONFIRMATION MODAL ===== */}
+            {/*  DELETE CONFIRMATION MODAL */}
             {deleteModalOpen && (
                 <div
                     style={{
@@ -1323,7 +1323,7 @@ export default function AccountingPage() {
                 </div>
             )}
 
-            {/* ===== SCROLL TO TOP BUTTON ===== */}
+            {/*  SCROLL TO TOP BUTTON */}
             {showScrollTop && (
                 <button
                     onClick={() => window.scrollTo({top: 0, behavior: "smooth"})}
@@ -1354,7 +1354,7 @@ export default function AccountingPage() {
     );
 }
 
-// ===== REUSABLE STAT CARD =====
+//  REUSABLE STAT CARD
 function StatCard({label, value, color, icon, isCount}) {
     return (
         <div
@@ -1390,7 +1390,7 @@ function StatCard({label, value, color, icon, isCount}) {
     );
 }
 
-// ===== INPUT COMPONENT =====
+// INPUT COMPONENT
 function Input({label, type = "text", value, onChange, min = "0", step = "1", ...props}) {
     const handleChange = (e) => {
         let val = e.target.value;
@@ -1424,7 +1424,7 @@ function Input({label, type = "text", value, onChange, min = "0", step = "1", ..
     );
 }
 
-// ===== SELECT COMPONENT =====
+// SELECT COMPONENT
 function Select({label, options, value, onChange}) {
     return (
         <div style={{display: "flex", flexDirection: "column", gap: "6px"}}>
@@ -1438,7 +1438,7 @@ function Select({label, options, value, onChange}) {
     );
 }
 
-// ===== PAGINATION STYLES =====
+//  PAGINATION STYLES
 const paginationContainer = {
     padding: "16px 24px",
     borderTop: `1px solid ${GOLD}33`,

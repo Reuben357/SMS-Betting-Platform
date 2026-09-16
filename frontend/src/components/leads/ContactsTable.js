@@ -17,6 +17,7 @@ import {exportToPDF} from "@/lib/pdfExport";
 import {getTierColor} from "@/lib/tierColors";
 import {exportToCSV} from "@/lib/exportService";
 import SharedScrollableSelect from "@/components/ui/ScrollableSelect";
+import {formatDateTime, formatDate} from "@/lib/formatDateTime";
 
 // Midnight Gold palette
 import {
@@ -268,7 +269,7 @@ export default function ContactsTable({
         return () => window.removeEventListener("scroll", handleScroll);
     }, []);
 
-    // ===== EXPORT =====
+    // EXPORT
     const handleExport = () => {
         let columns, rows;
         if (jackpotMode) {
@@ -535,7 +536,7 @@ export default function ContactsTable({
 
                                     {/* Date Added */}
                                     <td style={{...tdStyle, color: TEXT_SECONDARY, fontSize: "12px"}}>
-                                        {new Date(c.created_at).toLocaleDateString("en-GB")}
+                                        {formatDate(c.created_at)}
                                     </td>
 
                                     {/* CSV column – button that opens modal */}
@@ -740,7 +741,7 @@ export default function ContactsTable({
                                             color: TEXT_SECONDARY,
                                             fontSize: "12px"
                                         }}>
-                                            {new Date(row.date_created).toLocaleString()}
+                                            {formatDateTime(row.date_created)}
                                         </td>
                                     </tr>
                                 ))}
@@ -786,7 +787,7 @@ export default function ContactsTable({
     );
 }
 
-// Styles (unchanged)
+// Styles
 const cardStyle = {
     background: CARD_BG,
     borderRadius: "16px",

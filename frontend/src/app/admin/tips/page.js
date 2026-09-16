@@ -8,6 +8,7 @@ import {
     Trash2, ChevronDown, ChevronUp, CheckCircle, AlertTriangle, Lock,
     ChevronLeft, ChevronRight,
 } from "lucide-react";
+import {formatDateTime} from "@/lib/formatDateTime";
 
 // Midnight Gold color palette
 const BG_DARK = "#1A1A1A";
@@ -19,7 +20,7 @@ const GOLD_LIGHT = "#D4AF6A";
 const DANGER = "#EF4444";
 const WARNING = "#F59E0B";
 
-// Custom scrollable dropdown component (unchanged)
+// Custom scrollable dropdown component
 function ScrollablePackageSelect({packages, packageCapacity, value, onChange, isFull}) {
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef(null);
@@ -133,7 +134,7 @@ function ConfirmModal({isOpen, onClose, onConfirm, tipName}) {
     );
 }
 
-// Modal styles (unchanged)
+// Modal styles
 const modalOverlayStyle = {
     position: "fixed",
     top: 0,
@@ -552,7 +553,7 @@ export default function TipsPage() {
                                             <div style={{flex: 2}}>
                                                 <div style={styles.gameTitle}>{tip.game_name}</div>
                                                 <div
-                                                    style={styles.subText}>{new Date(tip.match_datetime).toLocaleString()}</div>
+                                                    style={styles.subText}>{formatDateTime(tip.match_datetime)}</div>
                                             </div>
                                             <div style={{flex: 1, color: GOLD, fontWeight: 600, fontSize: "13px"}}>
                                                 {tip.prediction}
@@ -738,7 +739,6 @@ export default function TipsPage() {
     );
 }
 
-// Styles (unchanged from original, with additions for pagination? They already exist)
 const styles = {
     pageWrapper: {background: BG_DARK, minHeight: "100vh"},
     content: {padding: "30px", maxWidth: "1200px", margin: "0 auto"},

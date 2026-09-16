@@ -296,7 +296,7 @@ export default function SubscriptionCustomersTable() {
                                     KES {Number(cust.total_subscription_amount).toLocaleString()}
                                 </td>
                                 <td style={{ textAlign: "right", padding: "16px 24px", color: TEXT_SECONDARY, fontSize: "12px" }}>
-                                    {new Date(cust.last_subscription_date).toLocaleDateString()}
+                                    {new Date(cust.last_subscription_date).toLocaleString('en-KE', { dateStyle: 'medium', timeStyle: 'short' })}
                                 </td>
                             </tr>
                         ))

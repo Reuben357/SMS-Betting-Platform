@@ -7,12 +7,14 @@ import ScrollableSelect from "@/components/ui/ScrollableSelect";
 
 // Midnight Gold color palette
 import {BG_DARK, CARD_BG, TEXT_PRIMARY, TEXT_SECONDARY, GOLD, GOLD_LIGHT, DANGER, SUCCESS, WARNING} from "@/lib/theme";
+import {formatDateTime} from "@/lib/formatDateTime";
 
 const AUDIENCE_TYPES = [
+    {value: "subscription_customers", label: "Active Jackpot Customers"},
     {value: "potential_tier", label: "Potential Tier"},
     {value: "active_sub", label: "Active Sub-Tier"},
     {value: "phone", label: "Single Number"},
-    {value: "jackpot", label: "Jackpot Customers"},
+    {value: "jackpot", label: "Jackpot Leads (CSV)"},
 ];
 
 const MESSAGE_TYPES = [
@@ -49,10 +51,9 @@ function StatusBadge({status}) {
     );
 }
 
-// ---- Template Editor Panel ----
+//  Template Editor Panel 
 function TemplatePanel() {
     const PAYMENT_LIMIT = 147;
-
 
     const [templates, setTemplates] = useState({
         payment_confirmation: "",
@@ -68,6 +69,8 @@ function TemplatePanel() {
         "4. Olympiacos v Leverkusen (GG)\n " +
         "5. Tottenham v Dortmund (GG) ",
     );
+    //  preview name state for payment confirmation
+    const [previewName, setPreviewName] = useState("Jessie");
 
     const [paymentConfirmationEnabled, setPaymentConfirmationEnabled] = useState(true);
 
@@ -160,14 +163,14 @@ function TemplatePanel() {
         }
     };
 
+    //  renderPreview now replaces {name} as well
     const renderPreview = (template, type) => {
         if (!template) return "— No template yet —";
         let preview = template;
         if (type === "payment_confirmation") {
-            preview = preview.replace(
-                /{amount}/g,
-                parseInt(previewAmount).toLocaleString()
-            );
+            preview = preview
+                .replace(/{amount}/g, parseInt(previewAmount).toLocaleString())
+                .replace(/{name}/g, previewName || "there");
         } else if (type === "tips_delivery") {
             preview = preview.replace(/{tips}/g, previewTips);
         }
@@ -338,12 +341,19 @@ function TemplatePanel() {
                         </div>
                     )}
 
+                    {/*  added + Insert Name button */}
                     <div style={{display: "flex", gap: "12px", marginTop: "8px"}}>
                         <button
                             onClick={() => insertPlaceholder(paymentTextareaRef, "{amount}")}
                             style={styles.smallBtn}
                         >
                             + Insert Amount
+                        </button>
+                        <button
+                            onClick={() => insertPlaceholder(paymentTextareaRef, "{name}")}
+                            style={styles.smallBtn}
+                        >
+                            + Insert Name
                         </button>
                     </div>
                     <div style={styles.previewBox}>
@@ -404,7 +414,7 @@ function TemplatePanel() {
                     </div>
                 </div>
 
-                {/* Preview Amount */}
+                {/*  Preview Amount & Preview Name fields */}
                 <div style={{marginBottom: "20px"}}>
                     <label style={styles.label}>Preview Amount (KES)</label>
                     <input
@@ -412,6 +422,17 @@ function TemplatePanel() {
                         value={previewAmount}
                         onChange={(e) => setPreviewAmount(e.target.value)}
                         style={styles.input}
+                    />
+                </div>
+
+                <div style={{marginBottom: "20px"}}>
+                    <label style={styles.label}>Preview Name</label>
+                    <input
+                        type="text"
+                        value={previewName}
+                        onChange={(e) => setPreviewName(e.target.value)}
+                        style={styles.input}
+                        placeholder="e.g. Jessie"
                     />
                 </div>
 
@@ -429,7 +450,7 @@ function TemplatePanel() {
     );
 }
 
-// ---- Send Bulk SMS Panel with character limit ----
+//  Send Bulk SMS Panel with character limit
 function SendPanel() {
     const [potentialTiers, setPotentialTiers] = useState([]);
     const [activeTiers, setActiveTiers] = useState([]);
@@ -447,6 +468,24 @@ function SendPanel() {
 
     // Character limit for SMS
     const CHAR_LIMIT = 307;
+
+    //  ref for message textarea
+    const messageTextareaRef = useRef(null);
+
+    //  helper to insert placeholder at cursor position
+    function insertPlaceholder(placeholder) {
+        const textarea = messageTextareaRef.current;
+        if (!textarea) return;
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const newValue = message.substring(0, start) + placeholder + message.substring(end);
+        setMessage(newValue);
+        setTimeout(() => {
+            textarea.focus();
+            const pos = start + placeholder.length;
+            textarea.setSelectionRange(pos, pos);
+        }, 10);
+    }
 
     useEffect(() => {
         fetch("/api/proxy/tiers")
@@ -488,7 +527,9 @@ function SendPanel() {
         setStatusMsg({type: "", text: ""});
 
         const payload = {message: message.trim()};
-        if (audienceType === "potential_tier") {
+        if (audienceType === "subscription_customers") {
+            payload.subscription_customers = true;
+        } else if (audienceType === "potential_tier") {
             payload.tier = parseInt(selectedTier);
         } else if (audienceType === "active_sub") {
             payload.active_tier_letter = selectedLetter;
@@ -630,13 +671,24 @@ function SendPanel() {
 
                 <div style={{marginBottom: "10px"}}>
                     <label style={styles.label}>Message Content</label>
+                    {/*  UPDATED: attached ref, added conditional Insert Name button */}
                     <textarea
+                        ref={messageTextareaRef}
                         rows={4}
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
                         placeholder="Write your message..."
                         style={styles.textarea}
                     />
+                    {(audienceType === "subscription_customers" ||
+                        audienceType === "active_sub") && (
+                        <div style={{display: "flex", gap: "12px", marginTop: "8px"}}>
+                            <button onClick={() => insertPlaceholder("{name}")} style={styles.smallBtn}>
+                                + Insert Name
+                            </button>
+                        </div>
+                    )}
+
                     <div
                         style={{
                             display: "flex",
@@ -735,7 +787,7 @@ function SendPanel() {
     );
 }
 
-// ---- History Panel with soft-delete notification ----
+//  History Panel with soft-delete notification
 function HistoryPanel() {
     const [messages, setMessages] = useState([]);
     const [total, setTotal] = useState(0);
@@ -891,8 +943,8 @@ function HistoryPanel() {
                         <th style={styles.th}>Type</th>
                         <th style={styles.th}>Status</th>
                         <th style={styles.th}>Message</th>
-                        <th style={styles.th}>Date</th>
                         <th style={styles.th}>Tier / Audience</th>
+                        <th style={styles.th}>Date</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -929,15 +981,7 @@ function HistoryPanel() {
                             >
                                 {m.content}
                             </td>
-                            <td
-                                style={{
-                                    ...styles.td,
-                                    color: TEXT_SECONDARY,
-                                    fontSize: "12px",
-                                }}
-                            >
-                                {new Date(m.created_at).toLocaleDateString()}
-                            </td>
+
                             <td style={styles.td}>
                                     <span
                                         style={{
@@ -956,7 +1000,7 @@ function HistoryPanel() {
                                                 const tier = m.audience_type.split('_')[2];
                                                 return `JP Potential Tier ${tier}`;
                                             }
-
+                                            // if (m.audience_type === 'active_customers') return 'Active Customers';
                                             if (m.message_type === "tips_delivery") return "Tips Delivery";
                                             if (m.message_type === "payment_confirmation") return "Payment Confirmation";
                                             if (m.message_type === "subscription_tips") return "Subscription Tips";
@@ -964,6 +1008,17 @@ function HistoryPanel() {
                                             return "—";
                                         })()}
                                     </span>
+                            </td>
+
+                            <td
+                                style={{
+                                    ...styles.td,
+                                    color: TEXT_SECONDARY,
+                                    fontSize: "12px",
+                                    whitespace: "nowrap",
+                                }}
+                            >
+                                {formatDateTime(m.created_at)}
                             </td>
                         </tr>
                     ))}
@@ -1109,7 +1164,7 @@ function HistoryPanel() {
     );
 }
 
-// ---- Main Page ----
+//  Main Page
 export default function SMSPage() {
     // Scroll-to-top state and handler
     const [showScrollTop, setShowScrollTop] = useState(false);
@@ -1163,7 +1218,7 @@ export default function SMSPage() {
     );
 }
 
-// ---- Styles ----
+//  Styles
 const styles = {
     card: {
         background: CARD_BG,
