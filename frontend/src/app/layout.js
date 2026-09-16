@@ -15,12 +15,7 @@ export default function RootLayout({ children }) {
     return (
         <html lang="en">
         <body>
-        {/*
-          Providers is a 'use client' component (see src/components/Providers.js).
-          Auth0Provider must run client-side so profileRoute="/api/auth/me"
-          reaches the browser SDK. Rendering it directly in this server
-          component silently drops the prop.
-        */}
+        {/* Providers are "use client" — Auth0Provider must render client-side for profileRoute to reach the SDK (see Providers.js) */}
         <Providers>{children}</Providers>
         </body>
         </html>
