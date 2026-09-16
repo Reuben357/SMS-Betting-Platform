@@ -1,10 +1,9 @@
 const { pool } = require("../config/db");
-const emalifyService = require("./emalifyService");
+const onfonService = require("../services/onfonService");
 const { logger } = require("../middleware/errorHandler");
 
 /**
- * Send an SMS using Emalify V2 API.
- * If Emalify credentials are missing (e.g., no sender ID), logs the message and stores it as 'sent' (for testing).
+ * If Onfon credentials are missing (e.g., no sender ID), logs the message and stores it as 'sent' (for testing).
  *
  * @param {string} recipientPhone - Phone number (will be formatted automatically)
  * @param {string} content - Message text
@@ -21,12 +20,11 @@ async function sendSMS(
   sentBy = null,
   audienceType = null,
 ) {
-  const client = await pool.connect();
   let messageId = null;
 
   try {
     // Insert message with status 'processing' (or 'sent' if using fake mode)
-    const insertResult = await client.query(
+    const insertResult = await pool.query(
       `INSERT INTO messages (recipient_phone, message_type, content, status, session_id, sent_by, audience_type)
        VALUES ($1, $2, $3, 'processing', $4, $5, $6)
        RETURNING id`,
@@ -34,37 +32,50 @@ async function sendSMS(
     );
     messageId = insertResult.rows[0].id;
     
-    // Check if Emalify is configured (both API key and sender ID)
-    const hasEmalifyConfig = process.env.EMALIFY_API_KEY && process.env.EMALIFY_SENDER_ID;
+    // Check if Onfon is configured (both client ID and sender ID)
+    const hasOnfonConfig = process.env.ONFON_CLIENT_ID && process.env.ONFON_SENDER_ID;
 
-    if (!hasEmalifyConfig) {
+    if (!hasOnfonConfig) {
       // Fallback mode: log to console and mark as 'sent' (for testing)
       logger.warn(`[FAKE SMS] To: ${recipientPhone}, Type: ${messageType}, Content: ${content}`);
-      await client.query(`UPDATE messages SET status = 'sent' WHERE id = $1`, [messageId]);
-      await client.query("COMMIT");
+      await pool.query(`UPDATE messages SET status = 'sent' WHERE id = $1`, [messageId]);
       return { success: true, fake: true };
     }
 
-    // Real Emalify sending
-    const result = await emalifyService.sendSMS(recipientPhone, content);
+    // Real Onfon sending
+    const result = await onfonService.sendSMS(recipientPhone, content);
+
+    // Store message ID
+    if (result.providerId) {
+      try {
+        await pool.query(
+            `UPDATE messages SET message_provider_id = $1 WHERE id = $2`,
+            [result.providerId, messageId]
+        );
+      } catch (err) {
+        if (err.code === '23505') {
+          logger.warn(`Duplicate Onfon message_provider_id "${result.providerId}" - message ${messageId}`);
+        } else {
+          throw err;
+        }
+      }
+    }
     
     // Update status to 'sent' if successful
-    await client.query(`UPDATE messages SET status = 'sent' WHERE id = $1`, [messageId]);
-    await client.query("COMMIT");
-    logger.info(`SMS sent to ${recipientPhone} (${messageType}) via Emalify`);
+    await pool.query(`UPDATE messages SET status = 'sent' WHERE id = $1`, [messageId]);
+    logger.info(`SMS sent to ${recipientPhone} (${messageType}) via Onfon Media`);
     
     return { success: true, data: result };
   } catch (err) {
-    await client.query("ROLLBACK");
     logger.error(`SMS service error for ${recipientPhone}: ${err.message}`);
     
     if (messageId) {
       // Mark as failed in database
-      await pool.query(`UPDATE messages SET status = 'failed' WHERE id = $1`, [messageId]);
+      await pool
+          .query(`UPDATE messages SET status = 'failed' WHERE id = $1`, [messageId])
+          .catch(() => {});
     }
     throw err;
-  } finally {
-    client.release();
   }
 }
 
@@ -83,16 +94,16 @@ async function sendTipsDelivery(
     sessionId = null,
     sentBy = null,
     audienceType = null) {
-  // 1. Fetch the template from system_settings
+  //  Fetch the template from system_settings
   const templateResult = await pool.query(
       `SELECT value FROM system_settings WHERE key = 'tips_delivery_template'`
   );
   let template = templateResult.rows[0]?.value || '{tips}'; // fallback
 
-  // 2. Replace the placeholder with the actual tips
+  //  Replace the placeholder with the actual tips
   const content = template.replace(/{tips}/g, tipsContent);
 
-  // 3. Send the SMS using the existing sendSMS function
+  // Send the SMS using the existing sendSMS function
   return await sendSMS(
       recipientPhone,
       content,
